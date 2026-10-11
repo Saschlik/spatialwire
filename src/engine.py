@@ -40,9 +40,24 @@ VIRTUAL_PLAYBACK_NAME = "effect_output.virtual-surround-7.1-hesuvi"
 
 FOSS_PRESET_METADATA = {
     "hear": {
-        "name": "MIT KEMAR Reference",
-        "description": "Acoustically neutral binaural reference HRIR derived from MIT Media Lab KEMAR measurements.",
+        "name": "MIT KEMAR Reference (1994)",
+        "description": "Diffuse-field equalized MIT Media Lab KEMAR HATS reference with natural torso/shoulder warmth.",
         "category": "Studio Reference"
+    },
+    "sadie_kemar": {
+        "name": "SADIE II KEMAR HATS (2018)",
+        "description": "University of York KEMAR Head & Torso Simulator (48 kHz Genelec 8010, Apache-2.0) with full torso & shoulder reflections.",
+        "category": "HATS Torso Reference"
+    },
+    "sadie_kemar_room": {
+        "name": "SADIE II KEMAR Studio Room",
+        "description": "University of York KEMAR HATS + Acoustically Treated Listening Room BRIR (85 ms Genelec 8030/40, Apache-2.0) — ideal for IEMs.",
+        "category": "Studio Room & IEM"
+    },
+    "sadie_ku100": {
+        "name": "SADIE II Neumann KU 100",
+        "description": "University of York Neumann KU 100 binaural studio microphone head (Apache-2.0) with torso-warmth and pinna-smoothing compensation.",
+        "category": "Binaural Studio Mic"
     },
     "oal_dflt": {
         "name": "OpenAL Soft Standard",
@@ -51,28 +66,41 @@ FOSS_PRESET_METADATA = {
     },
     "oal+": {
         "name": "OpenAL Soft Wide",
-        "description": "Expanded horizontal stereo separation and heightened side channel awareness.",
+        "description": "Expanded horizontal stereo separation and 150 ms studio room reflections (-27.4 dB).",
         "category": "Wide Soundstage"
     },
     "oal++": {
         "name": "OpenAL Soft Extra Wide",
-        "description": "Pronounced spatial separation for competitive gaming and open-world immersion.",
+        "description": "Pronounced spatial separation for competitive gaming and open-world immersion (150 ms, -26.9 dB).",
         "category": "Competitive Gaming"
     },
     "oal+++": {
         "name": "OpenAL Soft Maximum",
-        "description": "Maximum spatial field expanse with accentuated rear and surround channel depth.",
+        "description": "Maximum cinema soundstage with 250 ms room decay (-24.5 dB) and deep rear channel expanse.",
         "category": "Cinematic Surround"
     },
     "oal_cia0": {
         "name": "OpenAL Soft CIA 0",
-        "description": "Close-field binaural HRIR profile from the CIAIR / OpenAL Soft acoustic dataset.",
+        "description": "Close-field anechoic binaural HRIR profile from the CIAIR / OpenAL Soft acoustic dataset.",
         "category": "Studio Close"
     },
     "oal_cia1": {
         "name": "OpenAL Soft CIA 1",
         "description": "Diffused binaural HRIR field from the CIAIR / OpenAL Soft acoustic dataset.",
         "category": "Open-Back Audiophile"
+    }
+}
+
+TRANSDUCER_MODES = {
+    "over-ear": {
+        "name": "Over-Ear Headphones",
+        "short": "Over-Ear",
+        "description": "Direct diffuse-field target for open and closed over-ear headphones (natural outer ear & open ear canal)."
+    },
+    "iem": {
+        "name": "In-Ear Monitors (IEM)",
+        "short": "IEM",
+        "description": "Compensates IEM 2.85 kHz ear-canal gain (-3.2 dB), restores HATS torso warmth (+1.8 dB @ 250 Hz), and smooths >9.5 kHz pinna notches."
     }
 }
 
@@ -369,9 +397,23 @@ def resolve_preset_path(preset_id_or_path):
     return None
 
 
-def generate_filter_chain_conf(wav_path, profile_name, hw_sink_name):
-    """Builds PipeWire filter-chain configuration with 16 acoustic convolvers and duplicate input splitters."""
+def get_transducer_mode():
+    """Returns the configured transducer mode ('over-ear' or 'iem')."""
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE, "r", encoding="utf-8") as f:
+                mode = json.load(f).get("transducer_mode", "over-ear")
+                if mode in TRANSDUCER_MODES:
+                    return mode
+        except Exception:
+            pass
+    return "over-ear"
+
+
+def generate_filter_chain_conf(wav_path, profile_name, hw_sink_name, transducer_mode=None):
+    """Builds PipeWire filter-chain configuration with 16 acoustic convolvers and optional IEM target compensation."""
     nchan = get_wav_channels(wav_path)
+    t_mode = transducer_mode if transducer_mode in TRANSDUCER_MODES else get_transducer_mode()
 
     if nchan == 7:
         convolvers = f"""
@@ -430,8 +472,32 @@ def generate_filter_chain_conf(wav_path, profile_name, hw_sink_name):
                     {{ type = builtin label = convolver name = convSR_R  config = {{ filename = "{wav_path}" channel = 9 }} }}
         """
 
+    if t_mode == "iem":
+        iem_nodes = """
+                    # IEM Target Compensation Stage (Torso Warmth + Ear-Canal Pinna De-Harsh + Treble Smoothing)
+                    { type = builtin label = bq_peaking   name = iemBodyL   control = { "Freq" = 250.0  "Q" = 0.8 "Gain" = 1.8  } }
+                    { type = builtin label = bq_peaking   name = iemPinnaL  control = { "Freq" = 2850.0 "Q" = 1.4 "Gain" = -3.2 } }
+                    { type = builtin label = bq_highshelf name = iemSmoothL control = { "Freq" = 9500.0 "Q" = 0.7 "Gain" = -2.0 } }
+                    { type = builtin label = bq_peaking   name = iemBodyR   control = { "Freq" = 250.0  "Q" = 0.8 "Gain" = 1.8  } }
+                    { type = builtin label = bq_peaking   name = iemPinnaR  control = { "Freq" = 2850.0 "Q" = 1.4 "Gain" = -3.2 } }
+                    { type = builtin label = bq_highshelf name = iemSmoothR control = { "Freq" = 9500.0 "Q" = 0.7 "Gain" = -2.0 } }"""
+        iem_links = """
+                    # IEM Post-Mixer Biquad Chain
+                    { output = "mixL:Out"       input = "iemBodyL:In"   }
+                    { output = "iemBodyL:Out"   input = "iemPinnaL:In"  }
+                    { output = "iemPinnaL:Out"  input = "iemSmoothL:In" }
+                    { output = "mixR:Out"       input = "iemBodyR:In"   }
+                    { output = "iemBodyR:Out"   input = "iemPinnaR:In"  }
+                    { output = "iemPinnaR:Out"  input = "iemSmoothR:In" }"""
+        graph_outputs = '[ "iemSmoothL:Out" "iemSmoothR:Out" ]'
+    else:
+        iem_nodes = ""
+        iem_links = ""
+        graph_outputs = '[ "mixL:Out" "mixR:Out" ]'
+
     return f"""{SPATIALWIRE_HEADER} (7.1 HRTF Filter-Chain)
 # Profile: {profile_name} ({nchan}-Channel HRIR)
+# Transducer Mode: {t_mode}
 # Hardware Target: {hw_sink_name}
 
 context.properties = {{
@@ -477,7 +543,7 @@ context.modules = [
 {convolvers}
                     # Stereo Ear Output Mixers
                     {{ type = builtin label = mixer name = mixL }}
-                    {{ type = builtin label = mixer name = mixR }}
+                    {{ type = builtin label = mixer name = mixR }}{iem_nodes}
                 ]
                 links = [
                     # Input Distribution: Each channel copies to BOTH Left and Right ear convolvers
@@ -516,13 +582,13 @@ context.modules = [
                     {{ output = "convRL_R:Out"  input = "mixR:In 5" }}
                     {{ output = "convRR_R:Out"  input = "mixR:In 6" }}
                     {{ output = "convSL_R:Out"  input = "mixR:In 7" }}
-                    {{ output = "convSR_R:Out"  input = "mixR:In 8" }}
+                    {{ output = "convSR_R:Out"  input = "mixR:In 8" }}{iem_links}
                 ]
                 inputs  = [
                     "copyFL:In" "copyFR:In" "copyFC:In" "copyLFE:In"
                     "copyRL:In" "copyRR:In" "copySL:In" "copySR:In"
                 ]
-                outputs = [ "mixL:Out" "mixR:Out" ]
+                outputs = {graph_outputs}
             }}
             capture.props = {{
                 node.name        = "{VIRTUAL_SINK_NAME}"
@@ -566,6 +632,7 @@ def get_current_status():
     nodes = get_all_sinks_and_filters()
     vsink = get_virtual_surround_sink(nodes)
     hw_sink = get_hardware_sink(nodes)
+    t_mode = get_transducer_mode()
 
     is_active = vsink is not None
     active_profile_id = ""
@@ -576,24 +643,28 @@ def get_current_status():
         m = re.search(r"Virtual Surround 7\.1 \(([^)]+)\)", lbl)
         if m:
             active_profile_id = m.group(1)
-        elif os.path.exists(STATE_FILE):
-            try:
-                with open(STATE_FILE) as f:
-                    data = json.load(f)
-                    active_profile_id = data.get("active_profile_id", "")
-            except Exception:
-                pass
 
+    if not active_profile_id and os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE) as f:
+                data = json.load(f)
+                active_profile_id = data.get("active_profile_id", "")
+        except Exception:
+            pass
+
+    if active_profile_id:
         meta = FOSS_PRESET_METADATA.get(active_profile_id)
         if meta:
             active_profile_name = meta["name"]
         else:
-            active_profile_name = active_profile_id or "Custom HRIR"
+            active_profile_name = active_profile_id
 
     return {
         "active": is_active,
         "active_profile_id": active_profile_id,
-        "active_profile_name": active_profile_name,
+        "active_profile_name": active_profile_name or "None",
+        "transducer_mode": t_mode,
+        "transducer_mode_name": TRANSDUCER_MODES[t_mode]["name"],
         "virtual_sink_id": vsink["id"] if vsink else None,
         "virtual_sink_name": vsink["node_name"] if vsink else None,
         "hardware_sink_id": hw_sink["id"] if hw_sink else None,
@@ -604,7 +675,7 @@ def get_current_status():
     }
 
 
-def enable_profile(preset_id_or_path, display_name=None):
+def enable_profile(preset_id_or_path, display_name=None, transducer_mode=None):
     """Enables and routes virtual 7.1 HRTF surround sound."""
     ensure_dirs()
     ensure_filter_chain_service()
@@ -615,6 +686,7 @@ def enable_profile(preset_id_or_path, display_name=None):
 
     pid = Path(wav_path).stem
     disp = display_name or FOSS_PRESET_METADATA.get(pid, {}).get("name", pid)
+    t_mode = transducer_mode if transducer_mode in TRANSDUCER_MODES else get_transducer_mode()
 
     hw_sink = get_hardware_sink()
     if not hw_sink:
@@ -632,7 +704,7 @@ def enable_profile(preset_id_or_path, display_name=None):
         except Exception:
             pass
 
-    conf_content = generate_filter_chain_conf(wav_path, pid, hw_sink_name)
+    conf_content = generate_filter_chain_conf(wav_path, pid, hw_sink_name, transducer_mode=t_mode)
     with open(FILTER_CHAIN_CONF, "w", encoding="utf-8") as f:
         f.write(conf_content)
 
@@ -664,8 +736,10 @@ def enable_profile(preset_id_or_path, display_name=None):
 
     # Save state
     state = {
+        "active": True,
         "active_profile_id": pid,
         "active_profile_name": disp,
+        "transducer_mode": t_mode,
         "wav_path": wav_path,
         "hardware_sink": hw_sink_name,
         "updated_at": time.time()
@@ -673,13 +747,53 @@ def enable_profile(preset_id_or_path, display_name=None):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
 
-    run_cmd(["notify-send", "-i", "audio-headphones", "SpatialWire 3D Audio", f"Active Profile: {disp}"])
+    t_short = TRANSDUCER_MODES[t_mode]["short"]
+    run_cmd(["notify-send", "-i", "audio-headphones", "SpatialWire 3D Audio", f"Active: {disp} [{t_short}]"])
     return {
         "success": True,
         "profile_id": pid,
         "profile_name": disp,
+        "transducer_mode": t_mode,
+        "transducer_mode_name": TRANSDUCER_MODES[t_mode]["name"],
         "virtual_sink_id": vsink_id,
         "hardware_sink": hw_sink_name
+    }
+
+
+def set_transducer_mode(mode):
+    """Sets the transducer target mode ('over-ear' or 'iem') and hot-reloads if active."""
+    ensure_dirs()
+    norm = mode.strip().lower()
+    if norm in ("iem", "iems", "in-ear", "inear"):
+        norm = "iem"
+    elif norm in ("over-ear", "overear", "headphones", "headphone"):
+        norm = "over-ear"
+    else:
+        return {"success": False, "error": f"Unknown transducer mode '{mode}'. Choose 'over-ear' or 'iem'."}
+
+    saved = {}
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+        except Exception:
+            saved = {}
+
+    saved["transducer_mode"] = norm
+    saved["updated_at"] = time.time()
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(saved, f, indent=2)
+
+    status = get_current_status()
+    if status["active"]:
+        pid = status.get("active_profile_id") or saved.get("active_profile_id") or "hear"
+        return enable_profile(pid, transducer_mode=norm)
+
+    return {
+        "success": True,
+        "transducer_mode": norm,
+        "transducer_mode_name": TRANSDUCER_MODES[norm]["name"],
+        "reloaded": False
     }
 
 
@@ -715,7 +829,12 @@ def disable_spatial():
 
     if os.path.exists(STATE_FILE):
         try:
-            os.remove(STATE_FILE)
+            with open(STATE_FILE, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            saved["active"] = False
+            saved["updated_at"] = time.time()
+            with open(STATE_FILE, "w", encoding="utf-8") as f:
+                json.dump(saved, f, indent=2)
         except Exception:
             pass
 

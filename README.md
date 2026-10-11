@@ -21,9 +21,10 @@
 * **👂 16-Convolver Binaural Matrix:** Accurately routes Front Left, Front Right, Center, LFE Subwoofer, Rear Left, Rear Right, Side Left, and Side Right through individual acoustic impulse responses to your ears.
 * **📁 HeSuVi & OpenAL HRIR Compatible:** Reads both 7-channel and 14-channel HeSuVi impulse response WAV files with automatic channel layout detection.
 * **🎛️ Non-Destructive & Portable:** Automatically provisions its user systemd service (`pipewire-filter-chain.service`) on any Linux distribution and backs up any pre-existing `filter-chain.conf` before activation.
+* **🎛️ Over-Ear Headphone & In-Ear Monitor (IEM) Target Modes:** Built-in PipeWire real-time biquad target compensation (`spatialwire mode iem` / `over-ear`) that eliminates the 2.85 kHz double ear-canal peak on IEMs, restores HATS torso/shoulder warmth (250 Hz), and smooths >9.5 kHz pinna comb-filtering.
 * **⌨️ ClickClick Co-Existence:** Dispatches zero-downtime Unix signals (`SIGUSR1`) to `clickclickd` to keep mechanical switch acoustics synchronized across sink switches.
-* **🎨 Modern Libadwaita Interface:** Asynchronous GTK4 settings panel featuring live engine status, interactive preset switcher, one-click 3D directional positioning audio test, and a custom WAV file importer.
-* **📦 100% Free & Open Source (FOSS):** Bundled with open academic (MIT KEMAR / CIAIR) and LGPL-2.0+ (OpenAL Soft) acoustic measurements.
+* **🎨 Modern Libadwaita Interface:** Asynchronous GTK4 settings panel featuring live engine status, Headphone vs. IEM selector, interactive preset switcher, one-click 3D directional positioning audio test, and a custom WAV file importer.
+* **📦 100% Permissive FOSS Licensing:** Bundled exclusively with permissive **Apache-2.0** (University of York SADIE II), **MIT Media Lab** (KEMAR), and **LGPL-2.0+** (OpenAL Soft / CIAIR) acoustic measurements (strictly excluding copyleft `CC BY-SA` datasets).
 
 ---
 
@@ -34,6 +35,7 @@
 | **Processing Engine** | **PipeWire Native C Filter-Chain** | User-space PipeWire client | Windows Kernel Filter Driver |
 | **Buffer Latency** | **Single PipeWire Quantum (~1.3–10.6 ms)** | 40 ms – 120 ms buffer delay | 5 ms – 15 ms |
 | **CPU Overhead** | **< 0.5% (Realtime SPA Node)** | 4% – 12% (Full DSP suite) | < 1% |
+| **Headphone vs. IEM Target** | **Native RT Biquad Stage (`over-ear` / `iem`)** | Manual parametric EQ setup | Manual Peace EQ setup |
 | **Auto Sink Re-routing** | **Yes (pw-dump + wpctl + pw-link)** | Often breaks on Bluetooth/DAC disconnect | Requires manual default switch |
 | **HeSuVi WAV Support** | **7-channel & 14-channel native** | Requires manual SOFA / mono splits | Native |
 | **Modern Wayland UI** | **Libadwaita / GTK4** | GTK4 (Heavy suites) | Win32 (Legacy) |
@@ -44,15 +46,18 @@
 
 SpatialWire includes curated, license-verified impulse response profiles out of the box:
 
-| Profile ID | Acoustic Profile | Soundstage Characteristics | Upstream License |
-|---|---|---|---|
-| `hear` | **MIT KEMAR Reference** | Symmetrical, acoustically neutral dummy-head reference | **Free Use with Attribution** (MIT Media Lab) |
-| `oal_dflt` | **OpenAL Soft Standard** | Balanced cross-talk and pinpoint HRTF positioning | **LGPL-2.0+** |
-| `oal+` | **OpenAL Soft Wide** | Expanded horizontal separation and side awareness | **LGPL-2.0+** |
-| `oal++` | **OpenAL Soft Extra Wide** | High-separation stage for competitive gaming | **LGPL-2.0+** |
-| `oal+++` | **OpenAL Soft Maximum** | Cinematic expanse with accentuated rear channel depth | **LGPL-2.0+** |
-| `oal_cia0` | **OpenAL Soft CIA 0** | Close-field stage from CIAIR / OpenAL Soft dataset | **LGPL-2.0+ / Academic** |
-| `oal_cia1` | **OpenAL Soft CIA 1** | Diffuse field from CIAIR / OpenAL Soft dataset | **LGPL-2.0+ / Academic** |
+| Profile ID | Ch | Acoustic Profile | Soundstage Characteristics | Upstream License |
+|---|---|---|---|---|
+| `hear` | 7ch | **MIT KEMAR Reference (1994)** | Diffuse-field equalized HATS reference with natural torso/shoulder warmth | **Free Use with Attribution** (MIT Media Lab) |
+| `sadie_kemar` | 14ch | **SADIE II KEMAR HATS (2018)** | Modern 48 kHz Genelec 8010 HATS measurement with full torso & shoulders | **Apache-2.0** (University of York) |
+| `sadie_kemar_room` | 14ch | **SADIE II KEMAR Studio Room** | KEMAR HATS + Acoustically Treated Studio Room BRIR (85 ms) — ideal for IEMs | **Apache-2.0** (University of York) |
+| `sadie_ku100` | 14ch | **SADIE II Neumann KU 100** | Neumann KU 100 binaural studio head with torso-warmth & pinna smoothing | **Apache-2.0** (University of York) |
+| `oal_dflt` | 7ch | **OpenAL Soft Standard** | Balanced cross-talk and pinpoint HRTF positioning | **LGPL-2.0+** |
+| `oal+` | 14ch | **OpenAL Soft Wide** | Expanded horizontal separation with 150 ms studio room tail (`-27.4 dB`) | **LGPL-2.0+** |
+| `oal++` | 14ch | **OpenAL Soft Extra Wide** | High-separation stage for competitive gaming (`150 ms`, `-26.9 dB`) | **LGPL-2.0+** |
+| `oal+++` | 14ch | **OpenAL Soft Maximum** | Cinema soundstage with 250 ms room decay (`-24.5 dB`) | **LGPL-2.0+** |
+| `oal_cia0` | 7ch | **OpenAL Soft CIA 0** | Close-field anechoic stage from CIAIR / OpenAL Soft dataset | **LGPL-2.0+ / Academic** |
+| `oal_cia1` | 7ch | **OpenAL Soft CIA 1** | Diffuse field from CIAIR / OpenAL Soft dataset | **LGPL-2.0+ / Academic** |
 
 *(For full licensing and attributions, see [AUDIO_LICENSES.md](AUDIO_LICENSES.md).)*
 
@@ -120,8 +125,13 @@ spatialwire status
 # List all available HRTF profiles & channel configurations
 spatialwire list
 
-# Activate a profile (e.g. MIT KEMAR Reference)
+# Activate a profile (e.g. MIT KEMAR Reference or SADIE II KEMAR Studio Room)
 spatialwire set hear
+spatialwire set sadie_kemar_room
+
+# Switch between Over-Ear Headphones and In-Ear Monitors (IEM) target compensation
+spatialwire mode iem
+spatialwire mode over-ear
 
 # Activate OpenAL Soft Wide
 spatialwire set oal+
@@ -158,6 +168,8 @@ spatialwire import /path/to/custom_hrtf.wav
 │   FL  FR  FC  LFE  RL  RR  SL  SR  (SPA Realtime Convolver)  │
 │   │   │   │    │   │   │   │   │                             │
 │   └───┴───┴────┴───┴───┴───┴───┴───────► Stereo Mix (L / R)  │
+│                                              │               │
+│                  Optional IEM Biquad Stage ◄─┘               │
 └──────────────────────────────┬───────────────────────────────┘
                                │ Low-latency PipeWire Stream
                                ▼
@@ -172,5 +184,5 @@ spatialwire import /path/to/custom_hrtf.wav
 ## 📜 License
 
 * **Code:** Licensed under the [MIT License](LICENSE). Copyright © 2026 Sascha (Saschlik).
-* **Audio Assets:** Licensed under LGPL-2.0+ / GPL-2.0+ / MIT Media Lab Attribution. See [AUDIO_LICENSES.md](AUDIO_LICENSES.md) for details.
+* **Audio Assets:** Licensed under Apache-2.0 (SADIE II / University of York) / LGPL-2.0+ (OpenAL Soft) / GPL-2.0+ (ALSA test voice) / MIT Media Lab Attribution. Copyleft `CC BY-SA` datasets (e.g. TH Köln) are strictly excluded. See [AUDIO_LICENSES.md](AUDIO_LICENSES.md) for details.
 

@@ -142,10 +142,23 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         page.add(grp_status)
 
-        # ── Group 2: HRTF Profile Selection ──────────────────────────────────
+        # ── Group 2: HRTF Profile & Transducer Selection ─────────────────────
         grp_profiles = Adw.PreferencesGroup()
-        grp_profiles.set_title("HRTF Acoustic Presets")
-        grp_profiles.set_description("Select the binaural impulse response measurement for your headphones.")
+        grp_profiles.set_title("HRTF Acoustic Presets & Transducer Target")
+        grp_profiles.set_description("Select your headphone/IEM type and binaural impulse response measurement.")
+
+        self.transducer_keys = ["over-ear", "iem"]
+        self.transducer_combo = Adw.ComboRow()
+        self.transducer_combo.set_title("Headphone / Earphone Type")
+        self.transducer_combo.set_subtitle("Adjusts ear-canal resonance (2.85 kHz) and HATS torso warmth (250 Hz)")
+        self.transducer_combo.set_icon_name("audio-headphones-symbolic")
+        transducer_labels = [
+            "Over-Ear Headphones (Open / Closed Studio Reference)",
+            "In-Ear Monitors / IEMs (Ear-Canal & Torso Compensated)",
+        ]
+        self.transducer_combo.set_model(Gtk.StringList.new(transducer_labels))
+        self.transducer_combo.connect("notify::selected", self.on_transducer_selected)
+        grp_profiles.add(self.transducer_combo)
 
         self.profile_combo = Adw.ComboRow()
         self.profile_combo.set_title("Active Preset")
@@ -236,13 +249,18 @@ class SpatialWireWindow(Adw.ApplicationWindow):
             is_active = status["active"]
             self.master_switch.set_active(is_active)
 
+            t_mode = status.get("transducer_mode", "over-ear")
+            t_name = status.get("transducer_mode_name", "Over-Ear Headphones")
+            if t_mode in self.transducer_keys:
+                self.transducer_combo.set_selected(self.transducer_keys.index(t_mode))
+
             if is_active:
-                self.status_badge_row.set_subtitle(f"Active ({status['active_profile_name']})")
+                self.status_badge_row.set_subtitle(f"Active ({status['active_profile_name']} · {t_name})")
                 self.status_indicator.set_label("● Active")
                 self.status_indicator.remove_css_class("dim-label")
                 self.status_indicator.add_css_class("success")
             else:
-                self.status_badge_row.set_subtitle("Inactive (Direct Stereo DAC Passthrough)")
+                self.status_badge_row.set_subtitle(f"Inactive (Direct Stereo DAC · Target: {t_name})")
                 self.status_indicator.set_label("○ Inactive")
                 self.status_indicator.remove_css_class("success")
                 self.status_indicator.add_css_class("dim-label")
@@ -275,6 +293,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         self._busy = True
         self.master_switch.set_sensitive(False)
         self.profile_combo.set_sensitive(False)
+        self.transducer_combo.set_sensitive(False)
 
         def target():
             res = worker_fn()
@@ -284,6 +303,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
             self._busy = False
             self.master_switch.set_sensitive(True)
             self.profile_combo.set_sensitive(True)
+            self.transducer_combo.set_sensitive(True)
             done_fn(res)
             self.refresh_ui()
             return False
@@ -297,6 +317,8 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         active = self.master_switch.get_active()
         if active:
             idx = self.profile_combo.get_selected()
+            t_idx = self.transducer_combo.get_selected()
+            t_mode = self.transducer_keys[t_idx] if 0 <= t_idx < len(self.transducer_keys) else "over-ear"
             if 0 <= idx < len(self.presets):
                 pid = self.presets[idx]["id"]
 
@@ -306,12 +328,28 @@ class SpatialWireWindow(Adw.ApplicationWindow):
                     else:
                         self.show_toast(f"Error: {res.get('error')}")
 
-                self._run_async(lambda: engine.enable_profile(pid), on_done)
+                self._run_async(lambda: engine.enable_profile(pid, transducer_mode=t_mode), on_done)
         else:
             def on_done(_res):
                 self.show_toast("Surround disabled (Direct stereo mode)")
 
             self._run_async(engine.disable_spatial, on_done)
+
+    def on_transducer_selected(self, row, param):
+        if self._updating or self._busy:
+            return
+
+        t_idx = row.get_selected()
+        if 0 <= t_idx < len(self.transducer_keys):
+            t_mode = self.transducer_keys[t_idx]
+
+            def on_done(res):
+                if res.get("success"):
+                    self.show_toast(f"Target set: {res.get('transducer_mode_name')}")
+                else:
+                    self.show_toast(f"Error: {res.get('error')}")
+
+            self._run_async(lambda: engine.set_transducer_mode(t_mode), on_done)
 
     def on_profile_selected(self, row, param):
         idx = row.get_selected()
@@ -322,6 +360,8 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         if self.master_switch.get_active() and 0 <= idx < len(self.presets):
             pid = self.presets[idx]["id"]
+            t_idx = self.transducer_combo.get_selected()
+            t_mode = self.transducer_keys[t_idx] if 0 <= t_idx < len(self.transducer_keys) else "over-ear"
 
             def on_done(res):
                 if res.get("success"):
@@ -329,7 +369,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
                 else:
                     self.show_toast(f"Error: {res.get('error')}")
 
-            self._run_async(lambda: engine.enable_profile(pid), on_done)
+            self._run_async(lambda: engine.enable_profile(pid, transducer_mode=t_mode), on_done)
 
     def on_test_clicked(self, btn):
         res = engine.play_surround_test()

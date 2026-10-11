@@ -52,11 +52,13 @@ def cmd_status(args):
     if status["active"]:
         print(f"Status:          {C_GREEN}{C_BOLD}● ACTIVE{C_RESET}")
         print(f"Active Profile:  {C_CYAN}{status['active_profile_name']}{C_RESET} {C_DIM}(ID: {status['active_profile_id']}){C_RESET}")
+        print(f"Transducer Mode: {C_MAGENTA}{status['transducer_mode_name']}{C_RESET} {C_DIM}({status['transducer_mode']}){C_RESET}")
         print(f"Virtual Sink ID: {C_BOLD}{status['virtual_sink_id']}{C_RESET}")
         print(f"Hardware Target: {status['hardware_sink_label']}")
         print(f"Latency Mode:    {C_GREEN}{status['latency_mode']}{C_RESET}")
     else:
         print(f"Status:          {C_YELLOW}○ INACTIVE (Direct Stereo DAC Passthrough){C_RESET}")
+        print(f"Transducer Mode: {C_MAGENTA}{status['transducer_mode_name']}{C_RESET} {C_DIM}({status['transducer_mode']}){C_RESET}")
         print(f"Hardware Target: {status['hardware_sink_label']}")
         print(f"Available Presets: {status['presets_count']}")
 
@@ -68,8 +70,8 @@ def cmd_list(args):
         return
 
     print_banner()
-    print(f"\n{C_BOLD}{'PRESET ID':<14} {'PROFILE NAME':<26} {'CH':<4} {'CATEGORY':<20} {'DESCRIPTION'}{C_RESET}")
-    print(f"{C_DIM}{'─'*14} {'─'*26} {'─'*4} {'─'*20} {'─'*40}{C_RESET}")
+    print(f"\n{C_BOLD}{'PRESET ID':<18} {'PROFILE NAME':<28} {'CH':<4} {'CATEGORY':<22} {'DESCRIPTION'}{C_RESET}")
+    print(f"{C_DIM}{'─'*18} {'─'*28} {'─'*4} {'─'*22} {'─'*40}{C_RESET}")
 
     current_status = engine.get_current_status()
     active_pid = current_status.get("active_profile_id", "").lower()
@@ -77,7 +79,7 @@ def cmd_list(args):
     for p in presets:
         marker = f"{C_GREEN}* {C_RESET}" if p["id"].lower() == active_pid else "  "
         ch_str = f"{p['channels']}ch"
-        print(f"{marker}{C_CYAN}{p['id']:<12}{C_RESET} {C_BOLD}{p['name']:<26}{C_RESET} {ch_str:<4} {C_MAGENTA}{p['category']:<20}{C_RESET} {C_DIM}{p['description'][:48]}...{C_RESET}")
+        print(f"{marker}{C_CYAN}{p['id']:<16}{C_RESET} {C_BOLD}{p['name']:<28}{C_RESET} {ch_str:<4} {C_MAGENTA}{p['category']:<22}{C_RESET} {C_DIM}{p['description'][:48]}...{C_RESET}")
 
 
 def cmd_set(args):
@@ -85,11 +87,27 @@ def cmd_set(args):
         print(f"{C_RED}Error:{C_RESET} Please specify a preset ID or path to a .wav HRIR file.")
         sys.exit(1)
 
+    t_mode = getattr(args, "mode", None)
     print(f"{C_BLUE}:: Activating SpatialWire 7.1 HRTF filter-chain with preset '{args.profile}'...{C_RESET}")
-    res = engine.enable_profile(args.profile)
+    res = engine.enable_profile(args.profile, transducer_mode=t_mode)
     if res.get("success"):
-        print(f"{C_GREEN}✓ Activated:{C_RESET} {C_BOLD}{res['profile_name']}{C_RESET}")
+        print(f"{C_GREEN}✓ Activated:{C_RESET} {C_BOLD}{res['profile_name']}{C_RESET} [{C_MAGENTA}{res.get('transducer_mode_name')}{C_RESET}]")
         print(f"  Target: {res['hardware_sink']} (PipeWire Virtual Sink ID {res['virtual_sink_id']})")
+    else:
+        print(f"{C_RED}✗ Failed:{C_RESET} {res.get('error', 'Unknown error')}")
+        sys.exit(1)
+
+
+def cmd_mode(args):
+    if not args.target:
+        status = engine.get_current_status()
+        print(f"Current Transducer Mode: {C_MAGENTA}{C_BOLD}{status['transducer_mode_name']}{C_RESET} ({status['transducer_mode']})")
+        return
+
+    print(f"{C_BLUE}:: Switching transducer target compensation to '{args.target}'...{C_RESET}")
+    res = engine.set_transducer_mode(args.target)
+    if res.get("success"):
+        print(f"{C_GREEN}✓ Transducer Mode:{C_RESET} {C_BOLD}{res.get('transducer_mode_name')}{C_RESET}")
     else:
         print(f"{C_RED}✗ Failed:{C_RESET} {res.get('error', 'Unknown error')}")
         sys.exit(1)
@@ -163,11 +181,17 @@ def main():
 
     # set / on / enable / start
     p_set = subparsers.add_parser("set", help="Activate a 7.1 HRTF surround preset")
-    p_set.add_argument("profile", help="Preset ID (e.g. 'hear', 'oal_dflt', 'oal+') or path to a .wav file")
+    p_set.add_argument("profile", help="Preset ID (e.g. 'hear', 'sadie_kemar', 'sadie_kemar_room', 'sadie_ku100', 'oal_dflt', 'oal+') or path to a .wav file")
+    p_set.add_argument("--mode", choices=["over-ear", "iem"], help="Optional transducer target mode ('over-ear' or 'iem')")
 
     for alias in ("on", "enable", "start"):
         p_on = subparsers.add_parser(alias, help="Enable virtual surround (defaults to 'hear' if no preset specified)")
         p_on.add_argument("profile", nargs="?", default="hear", help="Optional preset ID (default: 'hear')")
+        p_on.add_argument("--mode", choices=["over-ear", "iem"], help="Optional transducer target mode ('over-ear' or 'iem')")
+
+    # mode
+    p_mode = subparsers.add_parser("mode", help="Set headphone / IEM transducer compensation mode ('over-ear' or 'iem')")
+    p_mode.add_argument("target", nargs="?", choices=["over-ear", "iem"], help="Target transducer mode ('over-ear' or 'iem')")
 
     # off / disable
     p_off = subparsers.add_parser("off", help="Disable virtual surround and restore stereo DAC")
@@ -196,6 +220,8 @@ def main():
         cmd_list(args)
     elif args.subcommand in ("set", "on", "enable", "start"):
         cmd_set(args)
+    elif args.subcommand == "mode":
+        cmd_mode(args)
     elif args.subcommand in ("off", "disable", "stop"):
         cmd_off(args)
     elif args.subcommand == "test":
