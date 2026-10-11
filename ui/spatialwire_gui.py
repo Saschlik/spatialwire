@@ -39,7 +39,17 @@ from gi.repository import Gtk, Adw, GLib, Gio
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 REPO_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-sys.path.insert(0, os.path.join(REPO_DIR, "src"))
+
+# Search in local repo, share directory, and system paths
+for candidate in [
+    os.path.join(REPO_DIR, "src"),
+    os.path.join(REPO_DIR, "share/spatialwire/src"),
+    os.path.join(SCRIPT_DIR, "../share/spatialwire/src"),
+    "/usr/share/spatialwire/src",
+    "/usr/local/share/spatialwire/src",
+]:
+    if os.path.isdir(candidate) and candidate not in sys.path:
+        sys.path.insert(0, candidate)
 
 import engine
 

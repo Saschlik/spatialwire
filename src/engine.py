@@ -555,9 +555,20 @@ def disable_spatial():
 
 def play_surround_test():
     """Plays an 8-channel directional test audio to verify spatial perception."""
-    test_file = os.path.join(REPO_DIR, "assets/test_surround.wav")
+    test_file = None
+    for cand in [
+        os.path.join(REPO_DIR, "assets/test_surround.wav"),
+        os.path.join(REPO_DIR, "share/spatialwire/assets/test_surround.wav"),
+        os.path.join(SCRIPT_DIR, "../assets/test_surround.wav"),
+        os.path.join(SCRIPT_DIR, "../share/spatialwire/assets/test_surround.wav"),
+        "/usr/share/spatialwire/assets/test_surround.wav",
+        "/usr/local/share/spatialwire/assets/test_surround.wav",
+    ]:
+        if os.path.isfile(cand):
+            test_file = cand
+            break
 
-    if not os.path.isfile(test_file):
+    if not test_file or not os.path.isfile(test_file):
         return {"success": False, "error": "Test audio asset not found"}
 
     if shutil.which("pw-play"):
