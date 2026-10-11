@@ -107,6 +107,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         grp_status.set_description("Echtzeit-Faltung (Convolver) über native PipeWire Realtime-Threads.")
 
         self.master_switch = Adw.SwitchRow()
+        self.master_switch.set_use_markup(False)
         self.master_switch.set_title("7.1 Virtual Surround & HRTF")
         self.master_switch.set_subtitle("Binauraler 3D-Kopfhörer-Raumklang")
         self.master_switch.set_icon_name("audio-headphones-symbolic")
