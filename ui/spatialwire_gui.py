@@ -37,7 +37,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib, Gio
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 REPO_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 sys.path.insert(0, os.path.join(REPO_DIR, "src"))
 
