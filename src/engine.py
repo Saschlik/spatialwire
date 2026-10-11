@@ -26,8 +26,6 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 BUNDLED_PRESETS_DIR = os.path.join(REPO_DIR, "presets")
 SYSTEM_PRESETS_DIR = "/usr/share/spatialwire/presets"
-LEGACY_PIPEWIRE_HRIR = os.path.join(PIPEWIRE_CONFIG_DIR, "hrir")
-LEGACY_PIPEWIRE_HRIR_REPO = os.path.join(PIPEWIRE_CONFIG_DIR, "hrir-repo/hrir")
 
 VIRTUAL_SINK_NAME = "effect_input.virtual-surround-7.1-hesuvi"
 VIRTUAL_PLAYBACK_NAME = "effect_output.virtual-surround-7.1-hesuvi"
@@ -179,8 +177,6 @@ def list_all_presets():
         USER_PRESETS_DIR,
         BUNDLED_PRESETS_DIR,
         SYSTEM_PRESETS_DIR,
-        LEGACY_PIPEWIRE_HRIR,
-        LEGACY_PIPEWIRE_HRIR_REPO,
     ]
 
     for sdir in search_dirs:
@@ -559,9 +555,7 @@ def disable_spatial():
 
 def play_surround_test():
     """Plays an 8-channel directional test audio to verify spatial perception."""
-    test_file = os.path.join(REPO_DIR, "assets/test_surround.ogg")
-    if not os.path.isfile(test_file):
-        test_file = os.path.join(HOME, ".config/pipewire/hrir-repo/test_surround.ogg")
+    test_file = os.path.join(REPO_DIR, "assets/test_surround.wav")
 
     if not os.path.isfile(test_file):
         return {"success": False, "error": "Test audio asset not found"}
