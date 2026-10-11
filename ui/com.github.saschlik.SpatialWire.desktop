@@ -1,0 +1,15 @@
+[Desktop Entry]
+Name=SpatialWire 3D Audio
+Name[de]=SpatialWire 3D Audio
+GenericName=Spatial HRTF Surround Sound
+GenericName[de]=3D-Raumklang & HRTF-Convolver
+Comment=Native PipeWire 7.1 Virtual Surround & Binaural HRTF Engine
+Comment[de]=Nativer PipeWire 7.1 Virtual Surround & Binauraler HRTF-Raumklang
+Exec=spatialwire-settings
+Icon=audio-headphones-symbolic
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Mixer;GTK;GNOME;Settings;
+StartupNotify=true
+StartupWMClass=com.github.saschlik.SpatialWire
+Keywords=Spatial;Surround;PipeWire;3D;Audio;HRTF;HeSuVi;Binaural;Headphones;Sound;

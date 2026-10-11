@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""
+SpatialWire CLI — High-Performance 7.1 Virtual Surround & Binaural HRTF Manager
+PipeWire native zero-overhead spatial audio control for Linux.
+"""
+
+import sys
+import os
+import argparse
+import json
+import subprocess
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+sys.path.insert(0, os.path.join(REPO_DIR, "src"))
+
+import engine
+
+# ANSI Colors
+C_RED = "\033[1;31m"
+C_GREEN = "\033[1;32m"
+C_BLUE = "\033[1;34m"
+C_CYAN = "\033[1;36m"
+C_YELLOW = "\033[1;33m"
+C_MAGENTA = "\033[1;35m"
+C_BOLD = "\033[1m"
+C_DIM = "\033[2m"
+C_RESET = "\033[0m"
+
+
+def print_banner():
+    print(f"{C_CYAN}{C_BOLD}SpatialWire{C_RESET} {C_DIM}— Native PipeWire 7.1 Binaural HRTF Convolver{C_RESET}")
+
+
+def cmd_status(args):
+    status = engine.get_current_status()
+    if getattr(args, "json", False):
+        print(json.dumps(status, indent=2))
+        return
+
+    print_banner()
+    if status["active"]:
+        print(f"Status:          {C_GREEN}{C_BOLD}● ACTIVE{C_RESET}")
+        print(f"Active Profile:  {C_CYAN}{status['active_profile_name']}{C_RESET} {C_DIM}(ID: {status['active_profile_id']}){C_RESET}")
+        print(f"Virtual Sink ID: {C_BOLD}{status['virtual_sink_id']}{C_RESET}")
+        print(f"Hardware Target: {status['hardware_sink_label']}")
+        print(f"Latency Mode:    {C_GREEN}{status['latency_mode']}{C_RESET}")
+    else:
+        print(f"Status:          {C_YELLOW}○ INACTIVE (Direct Stereo DAC Passthrough){C_RESET}")
+        print(f"Hardware Target: {status['hardware_sink_label']}")
+        print(f"Available Presets: {status['presets_count']}")
+
+
+def cmd_list(args):
+    presets = engine.list_all_presets()
+    if getattr(args, "json", False):
+        print(json.dumps(presets, indent=2))
+        return
+
+    print_banner()
+    print(f"\n{C_BOLD}{'PRESET ID':<14} {'PROFILE NAME':<26} {'CH':<4} {'CATEGORY':<20} {'DESCRIPTION'}{C_RESET}")
+    print(f"{C_DIM}{'─'*14} {'─'*26} {'─'*4} {'─'*20} {'─'*40}{C_RESET}")
+
+    current_status = engine.get_current_status()
+    active_pid = current_status.get("active_profile_id", "").lower()
+
+    for p in presets:
+        marker = f"{C_GREEN}* {C_RESET}" if p["id"].lower() == active_pid else "  "
+        ch_str = f"{p['channels']}ch"
+        print(f"{marker}{C_CYAN}{p['id']:<12}{C_RESET} {C_BOLD}{p['name']:<26}{C_RESET} {ch_str:<4} {C_MAGENTA}{p['category']:<20}{C_RESET} {C_DIM}{p['description'][:48]}...{C_RESET}")
+
+
+def cmd_set(args):
+    if not args.profile:
+        print(f"{C_RED}Error:{C_RESET} Please specify a preset ID or path to a .wav HRIR file.")
+        sys.exit(1)
+
+    print(f"{C_BLUE}:: Activating SpatialWire 7.1 HRTF filter-chain with preset '{args.profile}'...{C_RESET}")
+    res = engine.enable_profile(args.profile)
+    if res.get("success"):
+        print(f"{C_GREEN}✓ Activated:{C_RESET} {C_BOLD}{res['profile_name']}{C_RESET}")
+        print(f"  Target: {res['hardware_sink']} (PipeWire Virtual Sink ID {res['virtual_sink_id']})")
+    else:
+        print(f"{C_RED}✗ Failed:{C_RESET} {res.get('error', 'Unknown error')}")
+        sys.exit(1)
+
+
+def cmd_off(args):
+    print(f"{C_BLUE}:: Disabling SpatialWire 7.1 filter-chain...{C_RESET}")
+    res = engine.disable_spatial()
+    if res.get("success"):
+        print(f"{C_GREEN}✓ Disabled.{C_RESET} Direct stereo output restored to: {res.get('restored_sink', 'Default DAC')}")
+    else:
+        print(f"{C_RED}✗ Failed to disable filter-chain.{C_RESET}")
+
+
+def cmd_test(args):
+    print(f"{C_BLUE}:: Playing 3D Spatial Audio Channel positioning test...{C_RESET}")
+    res = engine.play_surround_test()
+    if res.get("success"):
+        print(f"{C_GREEN}✓ Playing test sample via {res.get('player')}.{C_RESET}")
+    else:
+        print(f"{C_RED}✗ Error:{C_RESET} {res.get('error')}")
+
+
+def cmd_import(args):
+    if not args.file:
+        print(f"{C_RED}Error:{C_RESET} Please specify path to a 7- or 14-channel HeSuVi WAV file.")
+        sys.exit(1)
+
+    res = engine.import_custom_wav(args.file)
+    if res.get("success"):
+        print(f"{C_GREEN}✓ Successfully imported custom HRIR preset:{C_RESET} {C_BOLD}{res['profile_id']}{C_RESET} ({res['channels']} channels)")
+        print(f"  Saved to: {res['path']}")
+    else:
+        print(f"{C_RED}✗ Import failed:{C_RESET} {res.get('error')}")
+        sys.exit(1)
+
+
+def cmd_gui(args):
+    gui_script = os.path.join(REPO_DIR, "ui/spatialwire_gui.py")
+    if not os.path.isfile(gui_script):
+        print(f"{C_RED}Error:{C_RESET} GUI script not found at {gui_script}")
+        sys.exit(1)
+
+    subprocess.Popen([sys.executable, gui_script])
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="spatialwire",
+        description="SpatialWire — High-Performance 7.1 Virtual Surround & Binaural HRTF Manager for PipeWire."
+    )
+    subparsers = parser.add_subparsers(dest="subcommand", help="Available subcommands")
+
+    # status
+    p_status = subparsers.add_parser("status", help="Show current SpatialWire & PipeWire status")
+    p_status.add_argument("--json", action="store_true", help="Output status in JSON format")
+
+    # list
+    p_list = subparsers.add_parser("list", help="List all available HRTF / HeSuVi presets")
+    p_list.add_argument("--json", action="store_true", help="Output presets list in JSON format")
+
+    # set
+    p_set = subparsers.add_parser("set", help="Activate a 7.1 HRTF surround preset")
+    p_set.add_argument("profile", help="Preset ID (e.g. 'hear', 'oal_dflt', 'oal+') or path to a .wav file")
+
+    # off / disable
+    p_off = subparsers.add_parser("off", help="Disable virtual surround and restore stereo DAC")
+    p_disable = subparsers.add_parser("disable", help="Alias for 'off'")
+    p_stop = subparsers.add_parser("stop", help="Alias for 'off'")
+
+    # test
+    p_test = subparsers.add_parser("test", help="Play 3D audio directional test sample")
+
+    # import
+    p_import = subparsers.add_parser("import", help="Import a custom HeSuVi 7/14-channel WAV file")
+    p_import.add_argument("file", help="Path to local .wav file")
+
+    # gui
+    p_gui = subparsers.add_parser("gui", help="Launch the Libadwaita graphical control panel")
+
+    if len(sys.argv) == 1:
+        cmd_status(argparse.Namespace(json=False))
+        print(f"\n{C_DIM}Run 'spatialwire --help' to see all commands.{C_RESET}")
+        return
+
+    args = parser.parse_args()
+    if args.subcommand in ("status", None):
+        cmd_status(args)
+    elif args.subcommand in ("list", "presets"):
+        cmd_list(args)
+    elif args.subcommand == "set":
+        cmd_set(args)
+    elif args.subcommand in ("off", "disable", "stop"):
+        cmd_off(args)
+    elif args.subcommand == "test":
+        cmd_test(args)
+    elif args.subcommand == "import":
+        cmd_import(args)
+    elif args.subcommand in ("gui", "settings"):
+        cmd_gui(args)
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
