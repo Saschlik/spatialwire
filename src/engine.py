@@ -5,6 +5,7 @@ PipeWire Native 7.1 Virtual Surround & Binaural HRTF Convolver System.
 
 import os
 import sys
+import signal
 import subprocess
 import time
 import re
@@ -20,11 +21,18 @@ STATE_FILE = os.path.join(SPATIALWIRE_CONFIG_DIR, "state.json")
 
 PIPEWIRE_CONFIG_DIR = os.path.join(HOME, ".config/pipewire")
 FILTER_CHAIN_CONF = os.path.join(PIPEWIRE_CONFIG_DIR, "filter-chain.conf")
+FILTER_CHAIN_BACKUP = os.path.join(PIPEWIRE_CONFIG_DIR, "filter-chain.conf.user.bak")
+SPATIALWIRE_HEADER = "# SpatialWire — PipeWire Virtual Surround"
+
+SYSTEMD_USER_DIR = os.path.join(HOME, ".config/systemd/user")
+FILTER_CHAIN_SERVICE = "pipewire-filter-chain.service"
 
 # Repo & System presets search paths
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 REPO_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 BUNDLED_PRESETS_DIR = os.path.join(REPO_DIR, "presets")
+SHARE_PRESETS_DIR = os.path.join(REPO_DIR, "share/spatialwire/presets")
+SYSTEM_LOCAL_PRESETS_DIR = "/usr/local/share/spatialwire/presets"
 SYSTEM_PRESETS_DIR = "/usr/share/spatialwire/presets"
 
 VIRTUAL_SINK_NAME = "effect_input.virtual-surround-7.1-hesuvi"
@@ -33,7 +41,7 @@ VIRTUAL_PLAYBACK_NAME = "effect_output.virtual-surround-7.1-hesuvi"
 FOSS_PRESET_METADATA = {
     "hear": {
         "name": "MIT KEMAR Reference",
-        "description": "Acoustically neutral binaural reference measurement (MIT Media Lab / Public Domain).",
+        "description": "Acoustically neutral binaural reference HRIR derived from MIT Media Lab KEMAR measurements.",
         "category": "Studio Reference"
     },
     "oal_dflt": {
@@ -58,12 +66,12 @@ FOSS_PRESET_METADATA = {
     },
     "oal_cia0": {
         "name": "OpenAL Soft CIA 0",
-        "description": "Close-mic intimate profile optimized for closed-back studio headphones.",
+        "description": "Close-field binaural HRIR profile from the CIAIR / OpenAL Soft acoustic dataset.",
         "category": "Studio Close"
     },
     "oal_cia1": {
         "name": "OpenAL Soft CIA 1",
-        "description": "Diffused binaural field tailored for open-back dynamic and planar magnetic drivers.",
+        "description": "Diffused binaural HRIR field from the CIAIR / OpenAL Soft acoustic dataset.",
         "category": "Open-Back Audiophile"
     }
 }
@@ -72,7 +80,7 @@ FOSS_PRESET_METADATA = {
 def run_cmd(cmd, check=False):
     """Executes a command and returns stripped stdout."""
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=check)
+        res = subprocess.run(cmd, capture_output=True, text=True, check=check, timeout=5)
         return res.stdout.strip()
     except Exception:
         return ""
@@ -83,6 +91,55 @@ def ensure_dirs():
     os.makedirs(SPATIALWIRE_CONFIG_DIR, exist_ok=True)
     os.makedirs(USER_PRESETS_DIR, exist_ok=True)
     os.makedirs(PIPEWIRE_CONFIG_DIR, exist_ok=True)
+
+
+def ensure_filter_chain_service():
+    """
+    Ensures a user systemd unit `pipewire-filter-chain.service` exists.
+    On standalone Linux distributions where the unit is not pre-installed,
+    creates `~/.config/systemd/user/pipewire-filter-chain.service` automatically.
+    """
+    cat_out = run_cmd(["systemctl", "--user", "cat", FILTER_CHAIN_SERVICE])
+    if cat_out:
+        return True
+
+    pw_bin = shutil.which("pipewire") or "/usr/bin/pipewire"
+    os.makedirs(SYSTEMD_USER_DIR, exist_ok=True)
+    unit_path = os.path.join(SYSTEMD_USER_DIR, FILTER_CHAIN_SERVICE)
+    unit_content = f"""[Unit]
+Description=PipeWire Filter Chain Service (Managed by SpatialWire)
+After=pipewire.service
+BindsTo=pipewire.service
+
+[Service]
+Type=simple
+ExecStart={pw_bin} -c filter-chain.conf
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+"""
+    try:
+        with open(unit_path, "w", encoding="utf-8") as f:
+            f.write(unit_content)
+        subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True, timeout=5)
+        return True
+    except Exception:
+        return False
+
+
+def notify_clickclick_reconnect():
+    """Signals ClickClick daemon (if running) to re-anchor its audio stream."""
+    pid_file = os.path.join(HOME, ".config/clickclick/daemon.pid")
+    if os.path.isfile(pid_file):
+        try:
+            with open(pid_file, "r") as f:
+                pid_str = f.read().strip()
+            if pid_str.isdigit():
+                os.kill(int(pid_str), signal.SIGUSR1)
+        except Exception:
+            pass
+    run_cmd(["pkill", "-USR1", "-f", r"(^|/)((\.)?clickclickd(-wrapped)?|clickclick_rs)( |$)"])
 
 
 def get_wav_channels(wav_path):
@@ -99,8 +156,59 @@ def get_wav_channels(wav_path):
     return 14
 
 
+def _get_default_sink_node_name():
+    """Queries wpctl for the current default audio sink's node.name."""
+    info = run_cmd(["wpctl", "inspect", "@DEFAULT_AUDIO_SINK@"])
+    if info:
+        m = re.search(r'node\.name\s*=\s*"([^"]+)"', info)
+        if m:
+            return m.group(1)
+    return ""
+
+
 def get_all_sinks_and_filters():
-    """Extracts active sink & filter nodes with their IDs from wpctl status."""
+    """
+    Extracts active sink & filter nodes with their IDs.
+    Uses fast JSON `pw-dump Node` primary path with `wpctl status` fallback.
+    """
+    default_node_name = _get_default_sink_node_name()
+    pw_raw = run_cmd(["pw-dump", "Node"])
+    if pw_raw:
+        try:
+            data = json.loads(pw_raw)
+            nodes = []
+            for item in data:
+                info = item.get("info") or {}
+                props = info.get("props") or {}
+                media_class = props.get("media.class", "")
+                if media_class in ("Audio/Sink", "Audio/Duplex"):
+                    nid = item.get("id")
+                    node_name = props.get("node.name", "")
+                    label = (
+                        props.get("node.description")
+                        or props.get("node.nick")
+                        or props.get("media.name")
+                        or node_name
+                    )
+                    is_virtual = (
+                        VIRTUAL_SINK_NAME in node_name
+                        or "virtual-surround" in node_name
+                        or "effect_" in node_name
+                        or "Virtual Surround" in label
+                    )
+                    nodes.append({
+                        "id": int(nid),
+                        "label": label,
+                        "node_name": node_name,
+                        "default": bool(default_node_name and node_name == default_node_name),
+                        "section": "filters" if is_virtual else "sinks",
+                    })
+            if nodes:
+                return nodes
+        except Exception:
+            pass
+
+    # Fallback: parse wpctl status
     out = run_cmd(["wpctl", "status"])
     lines = out.splitlines()
     nodes = []
@@ -140,18 +248,53 @@ def get_all_sinks_and_filters():
 
 
 def get_hardware_sink(nodes=None):
-    """Finds physical DAC/soundcard audio sink (excluding virtual/filters)."""
+    """
+    Finds physical DAC/soundcard audio sink (excluding virtual/filters).
+    Prioritizes:
+    1. Currently active default physical sink
+    2. Previously saved hardware_sink in STATE_FILE
+    3. USB / Headphone / Analog sinks over HDMI/DisplayPort
+    4. First available physical sink
+    """
     if nodes is None:
         nodes = get_all_sinks_and_filters()
 
+    hw_candidates = []
     for s in nodes:
         name = s.get("node_name", "")
         label = s.get("label", "")
         if s.get("section") == "sinks":
             if "virtual-surround" not in name and "effect_" not in name and "mono_" not in name:
                 if "Virtual Surround" not in label:
-                    return s
-    return None
+                    hw_candidates.append(s)
+
+    if not hw_candidates:
+        return None
+
+    # 1. Default physical sink
+    for s in hw_candidates:
+        if s.get("default"):
+            return s
+
+    # 2. Saved hardware_sink from state.json
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE, "r") as f:
+                saved_hw = json.load(f).get("hardware_sink", "")
+            if saved_hw:
+                for s in hw_candidates:
+                    if s.get("node_name") == saved_hw or s.get("label") == saved_hw:
+                        return s
+        except Exception:
+            pass
+
+    # 3. Prefer non-HDMI (USB/Analog/Headphone) sinks
+    for s in hw_candidates:
+        name_l = s.get("node_name", "").lower()
+        if "hdmi" not in name_l and "displayport" not in name_l:
+            return s
+
+    return hw_candidates[0]
 
 
 def get_virtual_surround_sink(nodes=None):
@@ -168,7 +311,7 @@ def get_virtual_surround_sink(nodes=None):
 
 
 def list_all_presets():
-    """Discovers all available HRIR presets across system, repo, and user directories."""
+    """Discovers all available HRIR presets across user, repo, Nix store, and system directories."""
     ensure_dirs()
     presets = []
     seen_ids = set()
@@ -176,6 +319,8 @@ def list_all_presets():
     search_dirs = [
         USER_PRESETS_DIR,
         BUNDLED_PRESETS_DIR,
+        SHARE_PRESETS_DIR,
+        SYSTEM_LOCAL_PRESETS_DIR,
         SYSTEM_PRESETS_DIR,
     ]
 
@@ -213,10 +358,10 @@ def list_all_presets():
 
 def resolve_preset_path(preset_id_or_path):
     """Resolves a preset identifier or explicit file path to a verified WAV file."""
-    if os.path.isfile(preset_id_or_path) and preset_id_or_path.endswith(".wav"):
+    if os.path.isfile(preset_id_or_path) and preset_id_or_path.lower().endswith(".wav"):
         return os.path.abspath(preset_id_or_path)
 
-    pid = preset_id_or_path.rstrip(".wav")
+    pid = preset_id_or_path[:-4] if preset_id_or_path.lower().endswith(".wav") else preset_id_or_path
     for p in list_all_presets():
         if p["id"].lower() == pid.lower():
             return p["path"]
@@ -285,11 +430,14 @@ def generate_filter_chain_conf(wav_path, profile_name, hw_sink_name):
                     {{ type = builtin label = convolver name = convSR_R  config = {{ filename = "{wav_path}" channel = 9 }} }}
         """
 
-    return f"""# SpatialWire — PipeWire Virtual Surround (7.1 HRTF Filter-Chain)
+    return f"""{SPATIALWIRE_HEADER} (7.1 HRTF Filter-Chain)
 # Profile: {profile_name} ({nchan}-Channel HRIR)
 # Hardware Target: {hw_sink_name}
 
-context.properties = {{ log.level = 0 }}
+context.properties = {{
+    core.daemon = false
+    log.level   = 0
+}}
 
 context.spa-libs = {{
     audio.convert.* = audioconvert/libspa-audioconvert
@@ -424,22 +572,18 @@ def get_current_status():
     active_profile_name = ""
 
     if is_active:
-        # Determine active profile name from label
         lbl = vsink.get("label", "")
         m = re.search(r"Virtual Surround 7\.1 \(([^)]+)\)", lbl)
         if m:
             active_profile_id = m.group(1)
-        else:
-            # Check state file
-            if os.path.exists(STATE_FILE):
-                try:
-                    with open(STATE_FILE) as f:
-                        data = json.load(f)
-                        active_profile_id = data.get("active_profile_id", "")
-                except Exception:
-                    pass
+        elif os.path.exists(STATE_FILE):
+            try:
+                with open(STATE_FILE) as f:
+                    data = json.load(f)
+                    active_profile_id = data.get("active_profile_id", "")
+            except Exception:
+                pass
 
-        # Match to human name
         meta = FOSS_PRESET_METADATA.get(active_profile_id)
         if meta:
             active_profile_name = meta["name"]
@@ -456,13 +600,15 @@ def get_current_status():
         "hardware_sink_name": hw_sink.get("node_name", "") if hw_sink else "",
         "hardware_sink_label": hw_sink.get("label", "Default Output") if hw_sink else "None",
         "presets_count": len(list_all_presets()),
-        "latency_mode": "0 ms (Kernel RT Priority)"
+        "latency_mode": "Quantum-Synced (RT Priority 88, ~1.3 ms)"
     }
 
 
 def enable_profile(preset_id_or_path, display_name=None):
     """Enables and routes virtual 7.1 HRTF surround sound."""
     ensure_dirs()
+    ensure_filter_chain_service()
+
     wav_path = resolve_preset_path(preset_id_or_path)
     if not wav_path or not os.path.isfile(wav_path):
         return {"success": False, "error": f"HRIR file not found for: {preset_id_or_path}"}
@@ -476,12 +622,22 @@ def enable_profile(preset_id_or_path, display_name=None):
 
     hw_sink_name = hw_sink.get("node_name") or hw_sink.get("label")
 
+    # Non-destructive backup if user had a custom non-SpatialWire filter-chain.conf
+    if os.path.isfile(FILTER_CHAIN_CONF):
+        try:
+            with open(FILTER_CHAIN_CONF, "r", encoding="utf-8", errors="ignore") as f:
+                first_line = f.readline()
+            if not first_line.startswith(SPATIALWIRE_HEADER):
+                shutil.copy2(FILTER_CHAIN_CONF, FILTER_CHAIN_BACKUP)
+        except Exception:
+            pass
+
     conf_content = generate_filter_chain_conf(wav_path, pid, hw_sink_name)
-    with open(FILTER_CHAIN_CONF, "w") as f:
+    with open(FILTER_CHAIN_CONF, "w", encoding="utf-8") as f:
         f.write(conf_content)
 
     # Restart pipewire-filter-chain service
-    subprocess.run(["systemctl", "--user", "restart", "pipewire-filter-chain.service"], capture_output=True)
+    subprocess.run(["systemctl", "--user", "restart", FILTER_CHAIN_SERVICE], capture_output=True, timeout=5)
 
     # Wait for sink to settle
     vsink = None
@@ -496,7 +652,7 @@ def enable_profile(preset_id_or_path, display_name=None):
 
     vsink_id = vsink["id"]
     run_cmd(["wpctl", "set-default", str(vsink_id)])
-    time.sleep(0.2)
+    time.sleep(0.15)
 
     # Explicit link to hardware playback
     run_cmd(["pw-link", f"{VIRTUAL_PLAYBACK_NAME}:output_FL", f"{hw_sink_name}:playback_FL"])
@@ -504,7 +660,7 @@ def enable_profile(preset_id_or_path, display_name=None):
     cleanup_duplicate_links(hw_sink_name)
 
     # Hot-reload ClickClick if running so keystroke sounds anchor smoothly
-    run_cmd(["pkill", "-USR1", "-x", "clickclick_rs"])
+    notify_clickclick_reconnect()
 
     # Save state
     state = {
@@ -514,7 +670,7 @@ def enable_profile(preset_id_or_path, display_name=None):
         "hardware_sink": hw_sink_name,
         "updated_at": time.time()
     }
-    with open(STATE_FILE, "w") as f:
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
 
     run_cmd(["notify-send", "-i", "audio-headphones", "SpatialWire 3D Audio", f"Active Profile: {disp}"])
@@ -528,20 +684,34 @@ def enable_profile(preset_id_or_path, display_name=None):
 
 
 def disable_spatial():
-    """Disables virtual surround and restores direct DAC stereo output."""
-    subprocess.run(["systemctl", "--user", "stop", "pipewire-filter-chain.service"], capture_output=True)
+    """Disables virtual surround and restores direct DAC stereo output (and any user filter-chain backup)."""
+    subprocess.run(["systemctl", "--user", "stop", FILTER_CHAIN_SERVICE], capture_output=True, timeout=5)
+    subprocess.run(["pkill", "-f", "pipewire -c filter-chain.conf"], capture_output=True, timeout=3)
 
-    if os.path.exists(FILTER_CHAIN_CONF):
+    if os.path.isfile(FILTER_CHAIN_BACKUP):
         try:
-            os.remove(FILTER_CHAIN_CONF)
+            shutil.move(FILTER_CHAIN_BACKUP, FILTER_CHAIN_CONF)
         except Exception:
             pass
+    elif os.path.isfile(FILTER_CHAIN_CONF):
+        try:
+            with open(FILTER_CHAIN_CONF, "r", encoding="utf-8", errors="ignore") as f:
+                first_line = f.readline()
+            if first_line.startswith(SPATIALWIRE_HEADER):
+                os.remove(FILTER_CHAIN_CONF)
+        except Exception:
+            pass
+
+    for _ in range(15):
+        if get_virtual_surround_sink() is None:
+            break
+        time.sleep(0.1)
 
     hw_sink = get_hardware_sink()
     if hw_sink:
         run_cmd(["wpctl", "set-default", str(hw_sink["id"])])
 
-    run_cmd(["pkill", "-USR1", "-x", "clickclick_rs"])
+    notify_clickclick_reconnect()
 
     if os.path.exists(STATE_FILE):
         try:
@@ -584,7 +754,7 @@ def play_surround_test():
 def import_custom_wav(src_path):
     """Imports an external HeSuVi WAV into user's presets."""
     ensure_dirs()
-    if not os.path.isfile(src_path) or not src_path.endswith(".wav"):
+    if not os.path.isfile(src_path) or not src_path.lower().endswith(".wav"):
         return {"success": False, "error": "File must be an existing .wav audio file"}
 
     channels = get_wav_channels(src_path)

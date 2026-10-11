@@ -128,12 +128,22 @@ def cmd_import(args):
 
 
 def cmd_gui(args):
-    gui_script = os.path.join(REPO_DIR, "ui/spatialwire_gui.py")
-    if not os.path.isfile(gui_script):
-        print(f"{C_RED}Error:{C_RESET} GUI script not found at {gui_script}")
-        sys.exit(1)
+    for cand in [
+        os.path.join(SCRIPT_DIR, "spatialwire-settings"),
+        os.path.join(REPO_DIR, "ui/spatialwire_gui.py"),
+        shutil.which("spatialwire-settings") or "",
+        "/usr/local/bin/spatialwire-settings",
+        "/usr/bin/spatialwire-settings",
+    ]:
+        if cand and os.path.isfile(cand):
+            if cand.endswith(".py"):
+                subprocess.Popen([sys.executable, cand])
+            else:
+                subprocess.Popen([cand])
+            return
 
-    subprocess.Popen([sys.executable, gui_script])
+    print(f"{C_RED}Error:{C_RESET} SpatialWire GUI executable (spatialwire-settings) not found.")
+    sys.exit(1)
 
 
 def main():
@@ -151,9 +161,13 @@ def main():
     p_list = subparsers.add_parser("list", help="List all available HRTF / HeSuVi presets")
     p_list.add_argument("--json", action="store_true", help="Output presets list in JSON format")
 
-    # set
+    # set / on / enable / start
     p_set = subparsers.add_parser("set", help="Activate a 7.1 HRTF surround preset")
     p_set.add_argument("profile", help="Preset ID (e.g. 'hear', 'oal_dflt', 'oal+') or path to a .wav file")
+
+    for alias in ("on", "enable", "start"):
+        p_on = subparsers.add_parser(alias, help="Enable virtual surround (defaults to 'hear' if no preset specified)")
+        p_on.add_argument("profile", nargs="?", default="hear", help="Optional preset ID (default: 'hear')")
 
     # off / disable
     p_off = subparsers.add_parser("off", help="Disable virtual surround and restore stereo DAC")
@@ -180,7 +194,7 @@ def main():
         cmd_status(args)
     elif args.subcommand in ("list", "presets"):
         cmd_list(args)
-    elif args.subcommand == "set":
+    elif args.subcommand in ("set", "on", "enable", "start"):
         cmd_set(args)
     elif args.subcommand in ("off", "disable", "stop"):
         cmd_off(args)

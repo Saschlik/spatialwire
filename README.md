@@ -16,14 +16,14 @@
 
 ## ✨ Key Features
 
-* **⚡ 0 ms User-Space Latency:** Convolves audio directly inside PipeWire's C/Rust native real-time audio threads (`rt.prio = 88`, `nice = -11`). No heavy JACK/Carla process, zero audio crackling, and sub-millisecond reaction times.
+* **⚡ Quantum-Synced Real-Time DSP:** Convolves audio directly inside PipeWire's native real-time audio threads (`rt.prio = 88`, `nice = -11`). No heavy external JACK/Carla host process and minimal CPU overhead (`~1.3 ms` at 64/48000 quantum).
 * **🌐 True 7.1 Spatial Surround:** Creates a virtual 8-channel sink (`effect_input.virtual-surround-7.1-hesuvi`) automatically recognized by games (Steam, Proton, Wine), media players (MPV, VLC), and browsers (Firefox, Chromium) as native 7.1 surround sound.
 * **👂 16-Convolver Binaural Matrix:** Accurately routes Front Left, Front Right, Center, LFE Subwoofer, Rear Left, Rear Right, Side Left, and Side Right through individual acoustic impulse responses to your ears.
 * **📁 HeSuVi & OpenAL HRIR Compatible:** Reads both 7-channel and 14-channel HeSuVi impulse response WAV files with automatic channel layout detection.
-* **🎛️ Dynamic Hotplug & Re-Routing:** Detects physical DAC/headphone switches via `wpctl` and re-anchors playback streams seamlessly.
-* **⌨️ ClickClick Co-Existence:** Dispatches zero-downtime Unix signals (`SIGUSR1`) to ClickClick to guarantee sub-millisecond mechanical switch acoustics without stream disruption.
-* **🎨 Modern Libadwaita Interface:** Elegant GTK4 settings panel featuring live engine status, interactive preset switcher, one-click 3D directional positioning audio test, and a custom WAV file importer.
-* **📦 100% Free & Open Source (FOSS):** Bundled exclusively with vetted, Public Domain and LGPL acoustic measurements.
+* **🎛️ Non-Destructive & Portable:** Automatically provisions its user systemd service (`pipewire-filter-chain.service`) on any Linux distribution and backs up any pre-existing `filter-chain.conf` before activation.
+* **⌨️ ClickClick Co-Existence:** Dispatches zero-downtime Unix signals (`SIGUSR1`) to `clickclickd` to keep mechanical switch acoustics synchronized across sink switches.
+* **🎨 Modern Libadwaita Interface:** Asynchronous GTK4 settings panel featuring live engine status, interactive preset switcher, one-click 3D directional positioning audio test, and a custom WAV file importer.
+* **📦 100% Free & Open Source (FOSS):** Bundled with open academic (MIT KEMAR / CIAIR) and LGPL-2.0+ (OpenAL Soft) acoustic measurements.
 
 ---
 
@@ -31,10 +31,10 @@
 
 | Feature | SpatialWire | EasyEffects / JamesDSP | Windows HeSuVi (EqualizerAPO) |
 |---|---|---|---|
-| **Processing Engine** | **PipeWire Native C Kernel RT** | User-space PipeWire client | Windows Kernel Filter Driver |
-| **Additional Buffer Latency** | **0 ms (Quantum 512 / 10.6 ms)** | 40 ms – 120 ms buffer delay | 5 ms – 15 ms |
-| **CPU Overhead** | **< 0.5% (Realtime SPA Node)** | 4% – 12% (Python/GTK DSP chain) | < 1% |
-| **Auto Sink Re-routing** | **Yes (wpctl + pw-link)** | Often breaks on Bluetooth/DAC disconnect | Requires manual default switch |
+| **Processing Engine** | **PipeWire Native C Filter-Chain** | User-space PipeWire client | Windows Kernel Filter Driver |
+| **Buffer Latency** | **Single PipeWire Quantum (~1.3–10.6 ms)** | 40 ms – 120 ms buffer delay | 5 ms – 15 ms |
+| **CPU Overhead** | **< 0.5% (Realtime SPA Node)** | 4% – 12% (Full DSP suite) | < 1% |
+| **Auto Sink Re-routing** | **Yes (pw-dump + wpctl + pw-link)** | Often breaks on Bluetooth/DAC disconnect | Requires manual default switch |
 | **HeSuVi WAV Support** | **7-channel & 14-channel native** | Requires manual SOFA / mono splits | Native |
 | **Modern Wayland UI** | **Libadwaita / GTK4** | GTK4 (Heavy suites) | Win32 (Legacy) |
 
@@ -46,13 +46,13 @@ SpatialWire includes curated, license-verified impulse response profiles out of 
 
 | Profile ID | Acoustic Profile | Soundstage Characteristics | Upstream License |
 |---|---|---|---|
-| `hear` | **MIT KEMAR Reference** | Symmetrical, acoustically neutral dummy-head reference | **Public Domain / CC0** |
+| `hear` | **MIT KEMAR Reference** | Symmetrical, acoustically neutral dummy-head reference | **Free Use with Attribution** (MIT Media Lab) |
 | `oal_dflt` | **OpenAL Soft Standard** | Balanced cross-talk and pinpoint HRTF positioning | **LGPL-2.0+** |
 | `oal+` | **OpenAL Soft Wide** | Expanded horizontal separation and side awareness | **LGPL-2.0+** |
-| `oal++` | **OpenAL Soft Extra Wide** | High-separation stage for competitive esports | **LGPL-2.0+** |
+| `oal++` | **OpenAL Soft Extra Wide** | High-separation stage for competitive gaming | **LGPL-2.0+** |
 | `oal+++` | **OpenAL Soft Maximum** | Cinematic expanse with accentuated rear channel depth | **LGPL-2.0+** |
-| `oal_cia0` | **OpenAL Soft CIA 0** | Intimate close-field stage for closed-back cans | **LGPL-2.0+** |
-| `oal_cia1` | **OpenAL Soft CIA 1** | Diffuse field tailored for open-back audiophile planar drivers | **LGPL-2.0+** |
+| `oal_cia0` | **OpenAL Soft CIA 0** | Close-field stage from CIAIR / OpenAL Soft dataset | **LGPL-2.0+ / Academic** |
+| `oal_cia1` | **OpenAL Soft CIA 1** | Diffuse field from CIAIR / OpenAL Soft dataset | **LGPL-2.0+ / Academic** |
 
 *(For full licensing and attributions, see [AUDIO_LICENSES.md](AUDIO_LICENSES.md).)*
 
@@ -159,11 +159,11 @@ spatialwire import /path/to/custom_hrtf.wav
 │   │   │   │    │   │   │   │   │                             │
 │   └───┴───┴────┴───┴───┴───┴───┴───────► Stereo Mix (L / R)  │
 └──────────────────────────────┬───────────────────────────────┘
-                               │ Low-latency 0 ms Kernel Stream
+                               │ Low-latency PipeWire Stream
                                ▼
 ┌──────────────────────────────────────────────────────────────┐
 │             Physical Hardware DAC / Soundcard                │
-│             (USB-C DAC / Creative AE-5 / ALSA)               │
+│             (USB-C DAC / PCIe / Analog / ALSA)               │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -172,4 +172,5 @@ spatialwire import /path/to/custom_hrtf.wav
 ## 📜 License
 
 * **Code:** Licensed under the [MIT License](LICENSE). Copyright © 2026 Sascha (Saschlik).
-* **Audio Assets:** Licensed under CC0 / Public Domain / LGPL. See [AUDIO_LICENSES.md](AUDIO_LICENSES.md) for details.
+* **Audio Assets:** Licensed under LGPL-2.0+ / GPL-2.0+ / MIT Media Lab Attribution. See [AUDIO_LICENSES.md](AUDIO_LICENSES.md) for details.
+

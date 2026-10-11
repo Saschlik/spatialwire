@@ -9,8 +9,9 @@ import sys
 import subprocess
 import json
 import re
+import threading
 
-# ── Dynamic Typelib Environment Setup ──────────────────────────────────────────
+# ── Dynamic Typelib Environment Setup (Fallback only if gi is not in environment) ──
 if "GI_TYPELIB_PATH" not in os.environ:
     wrapper_path = "/run/current-system/sw/bin/balonix-settings"
     if os.path.exists(wrapper_path):
@@ -74,6 +75,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         self.set_title("SpatialWire")
         self.set_default_size(680, 740)
         self._updating = False
+        self._busy = False
 
         self.presets = engine.list_all_presets()
         self.preset_ids = [p["id"] for p in self.presets]
@@ -114,7 +116,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         # ── Group 1: Master Status & Toggle ───────────────────────────────────
         grp_status = Adw.PreferencesGroup()
         grp_status.set_title("Surround Engine")
-        grp_status.set_description("Zero-overhead realtime convolution via native PipeWire DSP threads.")
+        grp_status.set_description("Low-overhead realtime convolution via native PipeWire DSP threads.")
 
         self.master_switch = Adw.SwitchRow()
         self.master_switch.set_use_markup(False)
@@ -168,7 +170,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         test_row = Adw.ActionRow()
         test_row.set_title("Play 3D Channel Positioning Test")
-        test_row.set_subtitle("Audition 8-channel studio directional voices and subwoofer sweep")
+        test_row.set_subtitle("Audition 8-channel directional voices and subwoofer sweep")
         test_btn = Gtk.Button(label="Play Test")
         test_btn.set_icon_name("media-playback-start-symbolic")
         test_btn.set_valign(Gtk.Align.CENTER)
@@ -196,8 +198,8 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         grp_specs.set_title("Architecture & Performance")
 
         row_lat = Adw.ActionRow()
-        row_lat.set_title("User-Space Processing Latency")
-        row_lat.set_subtitle("0 ms (Zero Overhead / Kernel Real-Time Priority 88)")
+        row_lat.set_title("Processing Latency")
+        row_lat.set_subtitle("Quantum-Synced DSP (Kernel Real-Time Priority 88, ~1.3 ms)")
         grp_specs.add(row_lat)
 
         row_conv = Adw.ActionRow()
@@ -214,8 +216,14 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         self.set_content(content_box)
 
-        # Initial UI population
+        # Initial UI population & live status sync
         self.refresh_ui()
+        GLib.timeout_add_seconds(2, self.periodic_check)
+
+    def periodic_check(self):
+        if not self._updating and not self._busy:
+            self.refresh_ui()
+        return True
 
     def show_toast(self, message):
         toast = Adw.Toast(title=message)
@@ -261,8 +269,29 @@ class SpatialWireWindow(Adw.ApplicationWindow):
             self.profile_desc_row.set_title(f"{p['name']} ({ch_info})")
             self.profile_desc_row.set_subtitle(p["description"])
 
+    def _run_async(self, worker_fn, done_fn):
+        if self._busy:
+            return
+        self._busy = True
+        self.master_switch.set_sensitive(False)
+        self.profile_combo.set_sensitive(False)
+
+        def target():
+            res = worker_fn()
+            GLib.idle_add(finish, res)
+
+        def finish(res):
+            self._busy = False
+            self.master_switch.set_sensitive(True)
+            self.profile_combo.set_sensitive(True)
+            done_fn(res)
+            self.refresh_ui()
+            return False
+
+        threading.Thread(target=target, daemon=True).start()
+
     def on_master_toggled(self, row, param):
-        if self._updating:
+        if self._updating or self._busy:
             return
 
         active = self.master_switch.get_active()
@@ -270,33 +299,37 @@ class SpatialWireWindow(Adw.ApplicationWindow):
             idx = self.profile_combo.get_selected()
             if 0 <= idx < len(self.presets):
                 pid = self.presets[idx]["id"]
-                res = engine.enable_profile(pid)
-                if res.get("success"):
-                    self.show_toast(f"Surround enabled: {res['profile_name']}")
-                else:
-                    self.show_toast(f"Error: {res.get('error')}")
-                    self.master_switch.set_active(False)
-        else:
-            engine.disable_spatial()
-            self.show_toast("Surround disabled (Direct stereo mode)")
 
-        self.refresh_ui()
+                def on_done(res):
+                    if res.get("success"):
+                        self.show_toast(f"Surround enabled: {res['profile_name']}")
+                    else:
+                        self.show_toast(f"Error: {res.get('error')}")
+
+                self._run_async(lambda: engine.enable_profile(pid), on_done)
+        else:
+            def on_done(_res):
+                self.show_toast("Surround disabled (Direct stereo mode)")
+
+            self._run_async(engine.disable_spatial, on_done)
 
     def on_profile_selected(self, row, param):
         idx = row.get_selected()
         self.update_profile_description(idx)
 
-        if self._updating:
+        if self._updating or self._busy:
             return
 
         if self.master_switch.get_active() and 0 <= idx < len(self.presets):
             pid = self.presets[idx]["id"]
-            res = engine.enable_profile(pid)
-            if res.get("success"):
-                self.show_toast(f"Preset activated: {res['profile_name']}")
-            else:
-                self.show_toast(f"Error: {res.get('error')}")
-            self.refresh_ui()
+
+            def on_done(res):
+                if res.get("success"):
+                    self.show_toast(f"Preset activated: {res['profile_name']}")
+                else:
+                    self.show_toast(f"Error: {res.get('error')}")
+
+            self._run_async(lambda: engine.enable_profile(pid), on_done)
 
     def on_test_clicked(self, btn):
         res = engine.play_surround_test()
