@@ -8,6 +8,8 @@
 [![HRTF](https://img.shields.io/badge/HRTF-7.1%20HeSuVi%20%26%20OpenAL-orange.svg)](https://airvs.github.io/HeSuVi)
 [![UI](https://img.shields.io/badge/UI-Libadwaita%20%2F%20GTK4-purple.svg)](https://gnome.pages.gitlab.gnome.org/libadwaita/)
 
+![SpatialWire Libadwaita Interface](assets/spatialwire-ui.png)
+
 **SpatialWire** brings authentic, zero-overhead 7.1 binaural surround sound and Head-Related Transfer Function (HRTF) spatialization to any Linux desktop. Powered directly by PipeWire's real-time filter-chain module, it eliminates the 50–100 ms audio latency and CPU drag of traditional user-space DSP hosts.
 
 ---
