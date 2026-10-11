@@ -25,7 +25,7 @@ All bundled Head-Related Impulse Responses (HRIR) and testing assets included in
 | `presets/oal+++.wav` | OpenAL Soft Maximum | OpenAL Soft Cinema HRIR (14-channel, 250 ms room tail) | **LGPL-2.0+** | Chris Robinson & OpenAL Soft Contributors |
 | `presets/oal_cia0.wav` | OpenAL Soft CIA 0 | CIAIR / OpenAL Soft HRIR Preset 0 (7-channel) | **LGPL-2.0+ / Open Academic Dataset** | OpenAL Soft Project / Nagoya University CIAIR Database |
 | `presets/oal_cia1.wav` | OpenAL Soft CIA 1 | CIAIR / OpenAL Soft HRIR Preset 1 (7-channel) | **LGPL-2.0+ / Open Academic Dataset** | OpenAL Soft Project / Nagoya University CIAIR Database |
-| `assets/test_surround.wav` | 3D Spatial Audio Test | 8-channel (7.1) directional speaker verification audio assembled from `alsa-utils` (`share/sounds/alsa/*.wav`) | **GPL-2.0-or-later** | The ALSA Project (Jaroslav Kysela & Contributors) |
+| `assets/test_surround.wav` | 3D Spatial Audio Test | 8-channel (7.1) directional acoustic chimes & spoken positional announcements generated via eSpeak-NG | **CC0-1.0 / MIT** (Public Domain) | SpatialWire Project |
 
 ---
 
@@ -52,11 +52,6 @@ All bundled Head-Related Impulse Responses (HRIR) and testing assets included in
 * **Institution:** Center for Integrated Acoustic Information Research (CIAIR), Nagoya University
 * **Description:** Acoustic head-related impulse response measurements converted via OpenAL Soft `makemhr`.
 
-### ALSA Project Speaker-Test Voice Samples (`assets/test_surround.wav`)
-* **Project:** Advanced Linux Sound Architecture (`alsa-utils` — `speaker-test/samples/`)
-* **Repository:** https://github.com/alsa-project/alsa-utils
-* **License:** GNU General Public License v2.0 or later (GPL-2.0-or-later)
-
 ---
 
 ## 3. Bundled Full License Texts
@@ -65,7 +60,7 @@ For full legal compliance and offline distribution according to Section 1 & 4 re
 
 - **Apache License 2.0:** [`LICENSES/Apache-2.0.txt`](file:///home/balo/spatialwire/LICENSES/Apache-2.0.txt)
 - **GNU Lesser General Public License 2.0 (LGPL-2.0):** [`LICENSES/LGPL-2.0.txt`](file:///home/balo/spatialwire/LICENSES/LGPL-2.0.txt)
-- **GNU General Public License 2.0 (GPL-2.0):** [`LICENSES/GPL-2.0.txt`](file:///home/balo/spatialwire/LICENSES/GPL-2.0.txt)
+
 
 
 

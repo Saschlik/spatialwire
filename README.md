@@ -184,5 +184,6 @@ spatialwire import /path/to/custom_hrtf.wav
 ## 📜 License
 
 * **Code:** Licensed under the [MIT License](LICENSE). Copyright © 2026 Sascha (Saschlik).
-* **Audio Assets:** Licensed under Apache-2.0 (SADIE II / University of York) / LGPL-2.0+ (OpenAL Soft) / GPL-2.0+ (ALSA test voice) / MIT Media Lab Attribution. Copyleft `CC BY-SA` datasets (e.g. TH Köln) are strictly excluded. See [AUDIO_LICENSES.md](AUDIO_LICENSES.md) for details.
+* **Audio Assets:** Licensed under Apache-2.0 (SADIE II / University of York) / LGPL-2.0+ (OpenAL Soft) / CC0-1.0 (Spatial Test Audio) / MIT Media Lab Attribution. Copyleft `CC BY-SA` datasets (e.g. TH Köln) and viral `GPL` code are strictly excluded. See [AUDIO_LICENSES.md](AUDIO_LICENSES.md) for details.
+
 
