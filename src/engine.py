@@ -229,62 +229,64 @@ def resolve_preset_path(preset_id_or_path):
 
 
 def generate_filter_chain_conf(wav_path, profile_name, hw_sink_name):
-    """Builds PipeWire filter-chain configuration with 16 acoustic convolvers."""
+    """Builds PipeWire filter-chain configuration with 16 acoustic convolvers and duplicate input splitters."""
     nchan = get_wav_channels(wav_path)
 
     if nchan == 7:
         convolvers = f"""
+                    # 16 Convolvers (7-Channel Symmetrical HeSuVi HRIR)
                     # Front Left
-                    {{ type = builtin label = convolver name = convFL_L  config = {{ filename = "{wav_path}" channel =  0 }} }}
-                    {{ type = builtin label = convolver name = convFL_R  config = {{ filename = "{wav_path}" channel =  1 }} }}
-                    # Side Left
-                    {{ type = builtin label = convolver name = convSL_L  config = {{ filename = "{wav_path}" channel =  2 }} }}
-                    {{ type = builtin label = convolver name = convSL_R  config = {{ filename = "{wav_path}" channel =  3 }} }}
+                    {{ type = builtin label = convolver name = convFL_L  config = {{ filename = "{wav_path}" channel = 0 }} }}
+                    {{ type = builtin label = convolver name = convFL_R  config = {{ filename = "{wav_path}" channel = 1 }} }}
+                    # Front Right (Mirrored from FL: Left Ear=1, Right Ear=0)
+                    {{ type = builtin label = convolver name = convFR_L  config = {{ filename = "{wav_path}" channel = 1 }} }}
+                    {{ type = builtin label = convolver name = convFR_R  config = {{ filename = "{wav_path}" channel = 0 }} }}
+                    # Front Center (Symmetrical: Left Ear=6, Right Ear=6)
+                    {{ type = builtin label = convolver name = convFC_L  config = {{ filename = "{wav_path}" channel = 6 }} }}
+                    {{ type = builtin label = convolver name = convFC_R  config = {{ filename = "{wav_path}" channel = 6 }} }}
+                    # LFE / Subwoofer (Treated as FC)
+                    {{ type = builtin label = convolver name = convLFE_L config = {{ filename = "{wav_path}" channel = 6 }} }}
+                    {{ type = builtin label = convolver name = convLFE_R config = {{ filename = "{wav_path}" channel = 6 }} }}
                     # Rear Left
-                    {{ type = builtin label = convolver name = convRL_L  config = {{ filename = "{wav_path}" channel =  4 }} }}
-                    {{ type = builtin label = convolver name = convRL_R  config = {{ filename = "{wav_path}" channel =  5 }} }}
-                    # Front Center (Symmetrical)
-                    {{ type = builtin label = convolver name = convFC_L  config = {{ filename = "{wav_path}" channel =  6 }} }}
-                    {{ type = builtin label = convolver name = convFC_R  config = {{ filename = "{wav_path}" channel =  6 }} }}
-                    # Front Right (Mirrored from FL)
-                    {{ type = builtin label = convolver name = convFR_L  config = {{ filename = "{wav_path}" channel =  1 }} }}
-                    {{ type = builtin label = convolver name = convFR_R  config = {{ filename = "{wav_path}" channel =  0 }} }}
-                    # Side Right (Mirrored from SL)
-                    {{ type = builtin label = convolver name = convSR_L  config = {{ filename = "{wav_path}" channel =  3 }} }}
-                    {{ type = builtin label = convolver name = convSR_R  config = {{ filename = "{wav_path}" channel =  2 }} }}
-                    # Rear Right (Mirrored from RL)
-                    {{ type = builtin label = convolver name = convRR_L  config = {{ filename = "{wav_path}" channel =  5 }} }}
-                    {{ type = builtin label = convolver name = convRR_R  config = {{ filename = "{wav_path}" channel =  4 }} }}
-                    # LFE / Subwoofer (Routed to Center HRIR)
-                    {{ type = builtin label = convolver name = convLFE_L config = {{ filename = "{wav_path}" channel =  6 }} }}
-                    {{ type = builtin label = convolver name = convLFE_R config = {{ filename = "{wav_path}" channel =  6 }} }}
+                    {{ type = builtin label = convolver name = convRL_L  config = {{ filename = "{wav_path}" channel = 4 }} }}
+                    {{ type = builtin label = convolver name = convRL_R  config = {{ filename = "{wav_path}" channel = 5 }} }}
+                    # Rear Right (Mirrored from RL: Left Ear=5, Right Ear=4)
+                    {{ type = builtin label = convolver name = convRR_L  config = {{ filename = "{wav_path}" channel = 5 }} }}
+                    {{ type = builtin label = convolver name = convRR_R  config = {{ filename = "{wav_path}" channel = 4 }} }}
+                    # Side Left
+                    {{ type = builtin label = convolver name = convSL_L  config = {{ filename = "{wav_path}" channel = 2 }} }}
+                    {{ type = builtin label = convolver name = convSL_R  config = {{ filename = "{wav_path}" channel = 3 }} }}
+                    # Side Right (Mirrored from SL: Left Ear=3, Right Ear=2)
+                    {{ type = builtin label = convolver name = convSR_L  config = {{ filename = "{wav_path}" channel = 3 }} }}
+                    {{ type = builtin label = convolver name = convSR_R  config = {{ filename = "{wav_path}" channel = 2 }} }}
         """
     else:
         convolvers = f"""
+                    # 16 Convolvers (14-Channel Full HeSuVi HRIR)
                     # Front Left
-                    {{ type = builtin label = convolver name = convFL_L  config = {{ filename = "{wav_path}" channel =  0 }} }}
-                    {{ type = builtin label = convolver name = convFL_R  config = {{ filename = "{wav_path}" channel =  1 }} }}
-                    # Side Left
-                    {{ type = builtin label = convolver name = convSL_L  config = {{ filename = "{wav_path}" channel =  2 }} }}
-                    {{ type = builtin label = convolver name = convSL_R  config = {{ filename = "{wav_path}" channel =  3 }} }}
-                    # Rear Left
-                    {{ type = builtin label = convolver name = convRL_L  config = {{ filename = "{wav_path}" channel =  4 }} }}
-                    {{ type = builtin label = convolver name = convRL_R  config = {{ filename = "{wav_path}" channel =  5 }} }}
-                    # Front Center
-                    {{ type = builtin label = convolver name = convFC_L  config = {{ filename = "{wav_path}" channel =  6 }} }}
-                    {{ type = builtin label = convolver name = convFC_R  config = {{ filename = "{wav_path}" channel = 13 }} }}
+                    {{ type = builtin label = convolver name = convFL_L  config = {{ filename = "{wav_path}" channel = 0 }} }}
+                    {{ type = builtin label = convolver name = convFL_R  config = {{ filename = "{wav_path}" channel = 1 }} }}
                     # Front Right
-                    {{ type = builtin label = convolver name = convFR_L  config = {{ filename = "{wav_path}" channel =  8 }} }}
-                    {{ type = builtin label = convolver name = convFR_R  config = {{ filename = "{wav_path}" channel =  7 }} }}
-                    # Side Right
-                    {{ type = builtin label = convolver name = convSR_L  config = {{ filename = "{wav_path}" channel = 10 }} }}
-                    {{ type = builtin label = convolver name = convSR_R  config = {{ filename = "{wav_path}" channel =  9 }} }}
+                    {{ type = builtin label = convolver name = convFR_L  config = {{ filename = "{wav_path}" channel = 8 }} }}
+                    {{ type = builtin label = convolver name = convFR_R  config = {{ filename = "{wav_path}" channel = 7 }} }}
+                    # Front Center
+                    {{ type = builtin label = convolver name = convFC_L  config = {{ filename = "{wav_path}" channel = 6 }} }}
+                    {{ type = builtin label = convolver name = convFC_R  config = {{ filename = "{wav_path}" channel = 13 }} }}
+                    # LFE / Subwoofer (Treated as FC)
+                    {{ type = builtin label = convolver name = convLFE_L config = {{ filename = "{wav_path}" channel = 6 }} }}
+                    {{ type = builtin label = convolver name = convLFE_R config = {{ filename = "{wav_path}" channel = 13 }} }}
+                    # Rear Left
+                    {{ type = builtin label = convolver name = convRL_L  config = {{ filename = "{wav_path}" channel = 4 }} }}
+                    {{ type = builtin label = convolver name = convRL_R  config = {{ filename = "{wav_path}" channel = 5 }} }}
                     # Rear Right
                     {{ type = builtin label = convolver name = convRR_L  config = {{ filename = "{wav_path}" channel = 12 }} }}
                     {{ type = builtin label = convolver name = convRR_R  config = {{ filename = "{wav_path}" channel = 11 }} }}
-                    # LFE / Subwoofer (Treated as FC)
-                    {{ type = builtin label = convolver name = convLFE_L config = {{ filename = "{wav_path}" channel =  6 }} }}
-                    {{ type = builtin label = convolver name = convLFE_R config = {{ filename = "{wav_path}" channel = 13 }} }}
+                    # Side Left
+                    {{ type = builtin label = convolver name = convSL_L  config = {{ filename = "{wav_path}" channel = 2 }} }}
+                    {{ type = builtin label = convolver name = convSL_R  config = {{ filename = "{wav_path}" channel = 3 }} }}
+                    # Side Right
+                    {{ type = builtin label = convolver name = convSR_L  config = {{ filename = "{wav_path}" channel = 10 }} }}
+                    {{ type = builtin label = convolver name = convSR_R  config = {{ filename = "{wav_path}" channel = 9 }} }}
         """
 
     return f"""# SpatialWire — PipeWire Virtual Surround (7.1 HRTF Filter-Chain)
@@ -318,35 +320,63 @@ context.modules = [
             media.name       = "Virtual Surround 7.1 ({profile_name})"
             filter.graph = {{
                 nodes = [
+                    # Duplicate inputs for binaural splitting (each channel feeds Left AND Right ear convolvers)
+                    {{ type = builtin label = copy name = copyFL  }}
+                    {{ type = builtin label = copy name = copyFR  }}
+                    {{ type = builtin label = copy name = copyFC  }}
+                    {{ type = builtin label = copy name = copyLFE }}
+                    {{ type = builtin label = copy name = copyRL  }}
+                    {{ type = builtin label = copy name = copyRR  }}
+                    {{ type = builtin label = copy name = copySL  }}
+                    {{ type = builtin label = copy name = copySR  }}
+
 {convolvers}
                     # Stereo Ear Output Mixers
                     {{ type = builtin label = mixer name = mixL }}
                     {{ type = builtin label = mixer name = mixR }}
                 ]
                 links = [
-                    # Left Ear Summation
-                    {{ output = "convFL_L:Out"  input = "mixL:In 1" }}
-                    {{ output = "convSL_L:Out"  input = "mixL:In 2" }}
-                    {{ output = "convRL_L:Out"  input = "mixL:In 3" }}
-                    {{ output = "convFC_L:Out"  input = "mixL:In 4" }}
-                    {{ output = "convFR_L:Out"  input = "mixL:In 5" }}
-                    {{ output = "convSR_L:Out"  input = "mixL:In 6" }}
-                    {{ output = "convRR_L:Out"  input = "mixL:In 7" }}
-                    {{ output = "convLFE_L:Out" input = "mixL:In 8" }}
+                    # Input Distribution: Each channel copies to BOTH Left and Right ear convolvers
+                    {{ output = "copyFL:Out"  input = "convFL_L:In"  }}
+                    {{ output = "copyFL:Out"  input = "convFL_R:In"  }}
+                    {{ output = "copyFR:Out"  input = "convFR_L:In"  }}
+                    {{ output = "copyFR:Out"  input = "convFR_R:In"  }}
+                    {{ output = "copyFC:Out"  input = "convFC_L:In"  }}
+                    {{ output = "copyFC:Out"  input = "convFC_R:In"  }}
+                    {{ output = "copyLFE:Out" input = "convLFE_L:In" }}
+                    {{ output = "copyLFE:Out" input = "convLFE_R:In" }}
+                    {{ output = "copyRL:Out"  input = "convRL_L:In"  }}
+                    {{ output = "copyRL:Out"  input = "convRL_R:In"  }}
+                    {{ output = "copyRR:Out"  input = "convRR_L:In"  }}
+                    {{ output = "copyRR:Out"  input = "convRR_R:In"  }}
+                    {{ output = "copySL:Out"  input = "convSL_L:In"  }}
+                    {{ output = "copySL:Out"  input = "convSL_R:In"  }}
+                    {{ output = "copySR:Out"  input = "convSR_L:In"  }}
+                    {{ output = "copySR:Out"  input = "convSR_R:In"  }}
 
-                    # Right Ear Summation
+                    # Left Ear Summation (mixL)
+                    {{ output = "convFL_L:Out"  input = "mixL:In 1" }}
+                    {{ output = "convFR_L:Out"  input = "mixL:In 2" }}
+                    {{ output = "convFC_L:Out"  input = "mixL:In 3" }}
+                    {{ output = "convLFE_L:Out" input = "mixL:In 4" }}
+                    {{ output = "convRL_L:Out"  input = "mixL:In 5" }}
+                    {{ output = "convRR_L:Out"  input = "mixL:In 6" }}
+                    {{ output = "convSL_L:Out"  input = "mixL:In 7" }}
+                    {{ output = "convSR_L:Out"  input = "mixL:In 8" }}
+
+                    # Right Ear Summation (mixR)
                     {{ output = "convFL_R:Out"  input = "mixR:In 1" }}
-                    {{ output = "convSL_R:Out"  input = "mixR:In 2" }}
-                    {{ output = "convRL_R:Out"  input = "mixR:In 3" }}
-                    {{ output = "convFC_R:Out"  input = "mixR:In 4" }}
-                    {{ output = "convFR_R:Out"  input = "mixR:In 5" }}
-                    {{ output = "convSR_R:Out"  input = "mixR:In 6" }}
-                    {{ output = "convRR_R:Out"  input = "mixR:In 7" }}
-                    {{ output = "convLFE_R:Out" input = "mixR:In 8" }}
+                    {{ output = "convFR_R:Out"  input = "mixR:In 2" }}
+                    {{ output = "convFC_R:Out"  input = "mixR:In 3" }}
+                    {{ output = "convLFE_R:Out" input = "mixR:In 4" }}
+                    {{ output = "convRL_R:Out"  input = "mixR:In 5" }}
+                    {{ output = "convRR_R:Out"  input = "mixR:In 6" }}
+                    {{ output = "convSL_R:Out"  input = "mixR:In 7" }}
+                    {{ output = "convSR_R:Out"  input = "mixR:In 8" }}
                 ]
                 inputs  = [
-                    "convFL_L:In" "convFR_R:In" "convFC_L:In" "convLFE_L:In"
-                    "convRL_L:In" "convRR_R:In" "convSL_L:In" "convSR_R:In"
+                    "copyFL:In" "copyFR:In" "copyFC:In" "copyLFE:In"
+                    "copyRL:In" "copyRR:In" "copySL:In" "copySR:In"
                 ]
                 outputs = [ "mixL:Out" "mixR:Out" ]
             }}
@@ -372,14 +402,17 @@ context.modules = [
 
 
 def cleanup_duplicate_links(hw_sink_name):
-    """Disconnects any erroneous direct links between virtual input and hardware."""
+    """Disconnects any erroneous loopback links between virtual playback and virtual capture."""
     try:
-        links_out = run_cmd(["pw-link", "-l"])
-        for line in links_out.splitlines():
-            if VIRTUAL_SINK_NAME in line and hw_sink_name in line:
-                m = re.findall(r"\d+", line)
-                if len(m) >= 2:
-                    run_cmd(["pw-link", "-d", m[0], m[1]])
+        out = run_cmd(["pw-link", "-l"])
+        curr_src = None
+        for line in out.splitlines():
+            if not line.startswith(" ") and ":" in line:
+                curr_src = line.strip()
+            elif "|->" in line and curr_src:
+                dest = line.split("|->")[1].strip()
+                if VIRTUAL_PLAYBACK_NAME in curr_src and VIRTUAL_SINK_NAME in dest:
+                    run_cmd(["pw-link", "-d", curr_src, dest])
     except Exception:
         pass
 
