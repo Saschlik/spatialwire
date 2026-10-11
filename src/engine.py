@@ -59,6 +59,26 @@ FOSS_PRESET_METADATA = {
         "description": "University of York Neumann KU 100 binaural studio microphone head (Apache-2.0) with torso-warmth and pinna-smoothing compensation.",
         "category": "Binaural Studio Mic"
     },
+    "sadie_ku100_room": {
+        "name": "SADIE II Neumann KU 100 Room",
+        "description": "University of York Neumann KU 100 with warm studio room reflections (85 ms decay, Apache-2.0) — eliminates dry in-head fatigue.",
+        "category": "Studio Room & IEM"
+    },
+    "sadie_wide": {
+        "name": "SADIE II Studio Wide",
+        "description": "University of York KEMAR reference with expanded room reflections (150 ms, -27.4 dB, Apache-2.0).",
+        "category": "Wide Soundstage"
+    },
+    "sadie_extrawide": {
+        "name": "SADIE II Studio Extra Wide",
+        "description": "University of York KEMAR with enhanced spatial separation and room presence (150 ms, -26.0 dB, Apache-2.0).",
+        "category": "Competitive Gaming"
+    },
+    "sadie_cinema": {
+        "name": "SADIE II Cinematic Hall",
+        "description": "University of York KEMAR reference with expansive cinema room acoustics (250 ms, -24.5 dB, Apache-2.0).",
+        "category": "Cinematic Surround"
+    },
     "oal_dflt": {
         "name": "OpenAL Soft Standard",
         "description": "Natural gaming soundstage with balanced cross-talk and pinpoint HRTF positioning.",

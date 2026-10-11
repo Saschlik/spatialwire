@@ -15,6 +15,10 @@ All bundled Head-Related Impulse Responses (HRIR) and testing assets included in
 | `presets/sadie_kemar.wav` | SADIE II KEMAR HATS (2018) | SADIE II Subject `D2` KEMAR Head & Torso Simulator (`D2_48K_24bit_256tap_FIR_SOFA.sofa`, 14-channel 48 kHz HeSuVi format) | **Apache-2.0** | Cal Armstrong, Lewis Thresh, Gavin Kearney — AudioLab, University of York (2018) |
 | `presets/sadie_kemar_room.wav` | SADIE II KEMAR Studio Room | SADIE II Subject `D2` KEMAR HATS (`D2_HRIR_SOFA` + `D2_BRIR_SOFA` Acoustically Treated Studio Room, 14-channel 48 kHz) | **Apache-2.0** | Cal Armstrong, Lewis Thresh, Gavin Kearney — AudioLab, University of York (2018) |
 | `presets/sadie_ku100.wav` | SADIE II Neumann KU 100 | SADIE II Subject `D1` Neumann KU 100 Dummy Head (`D1_48K_24bit_256tap_FIR_SOFA.sofa`, torso-warmth & pinna-smoothed 14-channel 48 kHz) | **Apache-2.0** | Cal Armstrong, Lewis Thresh, Gavin Kearney — AudioLab, University of York (2018) |
+| `presets/sadie_ku100_room.wav` | SADIE II Neumann KU 100 Room | SADIE II Subject `D1` Neumann KU 100 + Studio Listening Room impulse (85 ms decay, 14-channel 48 kHz) | **Apache-2.0** | Cal Armstrong, Lewis Thresh, Gavin Kearney — AudioLab, University of York (2018) |
+| `presets/sadie_wide.wav` | SADIE II Studio Wide | SADIE II Subject `D2` KEMAR HATS with wide soundstage reflection model (150 ms decay, -27.4 dB tail, 14-channel 48 kHz) | **Apache-2.0** | Cal Armstrong, Lewis Thresh, Gavin Kearney — AudioLab, University of York (2018) |
+| `presets/sadie_extrawide.wav` | SADIE II Studio Extra Wide | SADIE II Subject `D2` KEMAR HATS with extra wide spatial separation (150 ms decay, -26.0 dB tail, 14-channel 48 kHz) | **Apache-2.0** | Cal Armstrong, Lewis Thresh, Gavin Kearney — AudioLab, University of York (2018) |
+| `presets/sadie_cinema.wav` | SADIE II Cinematic Hall | SADIE II Subject `D2` KEMAR HATS with expansive cinema hall acoustics (250 ms decay, -24.5 dB tail, 14-channel 48 kHz) | **Apache-2.0** | Cal Armstrong, Lewis Thresh, Gavin Kearney — AudioLab, University of York (2018) |
 | `presets/oal_dflt.wav` | OpenAL Soft Standard | OpenAL Soft Default HRIR (7-channel HeSuVi format) | **LGPL-2.0+** | Chris Robinson & OpenAL Soft Contributors |
 | `presets/oal+.wav` | OpenAL Soft Wide | OpenAL Soft Extended Cross-Talk HRIR (14-channel, 150 ms room tail) | **LGPL-2.0+** | Chris Robinson & OpenAL Soft Contributors |
 | `presets/oal++.wav` | OpenAL Soft Extra Wide | OpenAL Soft High-Separation HRIR (14-channel, 150 ms room tail) | **LGPL-2.0+** | Chris Robinson & OpenAL Soft Contributors |
@@ -52,5 +56,16 @@ All bundled Head-Related Impulse Responses (HRIR) and testing assets included in
 * **Project:** Advanced Linux Sound Architecture (`alsa-utils` — `speaker-test/samples/`)
 * **Repository:** https://github.com/alsa-project/alsa-utils
 * **License:** GNU General Public License v2.0 or later (GPL-2.0-or-later)
+
+---
+
+## 3. Bundled Full License Texts
+
+For full legal compliance and offline distribution according to Section 1 & 4 requirements, full license texts are bundled directly within the repository:
+
+- **Apache License 2.0:** [`LICENSES/Apache-2.0.txt`](file:///home/balo/spatialwire/LICENSES/Apache-2.0.txt)
+- **GNU Lesser General Public License 2.0 (LGPL-2.0):** [`LICENSES/LGPL-2.0.txt`](file:///home/balo/spatialwire/LICENSES/LGPL-2.0.txt)
+- **GNU General Public License 2.0 (GPL-2.0):** [`LICENSES/GPL-2.0.txt`](file:///home/balo/spatialwire/LICENSES/GPL-2.0.txt)
+
 
 
