@@ -90,7 +90,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         header.set_title_widget(title_widget)
 
         refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
-        refresh_btn.set_tooltip_text("Status aktualisieren")
+        refresh_btn.set_tooltip_text("Refresh status")
         refresh_btn.connect("clicked", lambda b: self.refresh_ui())
         header.pack_end(refresh_btn)
 
@@ -113,28 +113,28 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         # ── Group 1: Master Status & Toggle ───────────────────────────────────
         grp_status = Adw.PreferencesGroup()
-        grp_status.set_title("Surround-Engine")
-        grp_status.set_description("Echtzeit-Faltung (Convolver) über native PipeWire Realtime-Threads.")
+        grp_status.set_title("Surround Engine")
+        grp_status.set_description("Zero-overhead realtime convolution via native PipeWire DSP threads.")
 
         self.master_switch = Adw.SwitchRow()
         self.master_switch.set_use_markup(False)
         self.master_switch.set_title("7.1 Virtual Surround & HRTF")
-        self.master_switch.set_subtitle("Binauraler 3D-Kopfhörer-Raumklang")
+        self.master_switch.set_subtitle("Binaural 3D Headphone Spatial Audio")
         self.master_switch.set_icon_name("audio-headphones-symbolic")
         self.master_switch.connect("notify::active", self.on_master_toggled)
         grp_status.add(self.master_switch)
 
         self.status_badge_row = Adw.ActionRow()
-        self.status_badge_row.set_title("Engine-Zustand")
-        self.status_badge_row.set_subtitle("Wird ermittelt...")
-        self.status_indicator = Gtk.Label(label="● Inaktiv")
+        self.status_badge_row.set_title("Engine State")
+        self.status_badge_row.set_subtitle("Detecting...")
+        self.status_indicator = Gtk.Label(label="● Inactive")
         self.status_indicator.add_css_class("dim-label")
         self.status_badge_row.add_suffix(self.status_indicator)
         grp_status.add(self.status_badge_row)
 
         self.hw_target_row = Adw.ActionRow()
-        self.hw_target_row.set_title("Physische Soundkarte")
-        self.hw_target_row.set_subtitle("Kein Ausgabegerät erkannt")
+        self.hw_target_row.set_title("Hardware DAC Target")
+        self.hw_target_row.set_subtitle("No output device detected")
         self.hw_target_row.set_icon_name("audio-card-symbolic")
         grp_status.add(self.hw_target_row)
 
@@ -142,11 +142,11 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         # ── Group 2: HRTF Profile Selection ──────────────────────────────────
         grp_profiles = Adw.PreferencesGroup()
-        grp_profiles.set_title("HRTF Akustik-Profile")
-        grp_profiles.set_description("Wähle das binaurale Impulsantwort-Modell für deine Kopfhörer.")
+        grp_profiles.set_title("HRTF Acoustic Presets")
+        grp_profiles.set_description("Select the binaural impulse response measurement for your headphones.")
 
         self.profile_combo = Adw.ComboRow()
-        self.profile_combo.set_title("Aktives Profil")
+        self.profile_combo.set_title("Active Preset")
         self.profile_combo.set_icon_name("audio-speakers-symbolic")
         profile_names = [f"{p['name']} ({p['category']})" for p in self.presets]
         self.profile_combo.set_model(Gtk.StringList.new(profile_names))
@@ -155,21 +155,21 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         # Profile Details Row
         self.profile_desc_row = Adw.ActionRow()
-        self.profile_desc_row.set_title("Klangcharakteristik")
-        self.profile_desc_row.set_subtitle("Profil auswählen für Beschreibung")
+        self.profile_desc_row.set_title("Soundstage Profile")
+        self.profile_desc_row.set_subtitle("Select a preset to view acoustic details")
         grp_profiles.add(self.profile_desc_row)
 
         page.add(grp_profiles)
 
         # ── Group 3: Testing & Import ─────────────────────────────────────────
         grp_tools = Adw.PreferencesGroup()
-        grp_tools.set_title("Audio-Werkzeuge & Diagnose")
-        grp_tools.set_description("Surround-Positionierung testen und eigene HeSuVi-Messungen importieren.")
+        grp_tools.set_title("Diagnostic & Custom Presets")
+        grp_tools.set_description("Verify 3D channel positioning and import custom HeSuVi measurements.")
 
         test_row = Adw.ActionRow()
-        test_row.set_title("3D-Positionierungstest abspielen")
-        test_row.set_subtitle("8-Kanal Testsignal (Vorne, Center, Hinten, Surround) abhören")
-        test_btn = Gtk.Button(label="Testen")
+        test_row.set_title("Play 3D Channel Positioning Test")
+        test_row.set_subtitle("Audition 8-channel studio directional voices and subwoofer sweep")
+        test_btn = Gtk.Button(label="Play Test")
         test_btn.set_icon_name("media-playback-start-symbolic")
         test_btn.set_valign(Gtk.Align.CENTER)
         test_btn.add_css_class("suggested-action")
@@ -179,9 +179,9 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         grp_tools.add(test_row)
 
         import_row = Adw.ActionRow()
-        import_row.set_title("HeSuVi WAV importieren")
-        import_row.set_subtitle("7- oder 14-Kanal WAV Impulsantwort zu Presets hinzufügen")
-        import_btn = Gtk.Button(label="Importieren...")
+        import_row.set_title("Import Custom HRIR WAV")
+        import_row.set_subtitle("Add custom 7-channel or 14-channel HeSuVi impulse response WAV")
+        import_btn = Gtk.Button(label="Import...")
         import_btn.set_icon_name("document-open-symbolic")
         import_btn.set_valign(Gtk.Align.CENTER)
         import_btn.connect("clicked", self.on_import_clicked)
@@ -193,16 +193,16 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         # ── Group 4: Performance & Hardware Specs ─────────────────────────────
         grp_specs = Adw.PreferencesGroup()
-        grp_specs.set_title("System-Architektur")
+        grp_specs.set_title("Architecture & Performance")
 
         row_lat = Adw.ActionRow()
-        row_lat.set_title("User-Space Latenz")
-        row_lat.set_subtitle("0 ms (Kernel Real-Time Priority Prio 88 / Nice -11)")
+        row_lat.set_title("User-Space Processing Latency")
+        row_lat.set_subtitle("0 ms (Zero Overhead / Kernel Real-Time Priority 88)")
         grp_specs.add(row_lat)
 
         row_conv = Adw.ActionRow()
-        row_conv.set_title("Convolver-Matrix")
-        row_conv.set_subtitle("16 parallele SPA-Convolver Nodes (FL, FR, FC, LFE, RL, RR, SL, SR)")
+        row_conv.set_title("Filter-Chain Matrix")
+        row_conv.set_subtitle("16 Parallel SPA Convolver Nodes (FL, FR, FC, LFE, RL, RR, SL, SR)")
         grp_specs.add(row_conv)
 
         page.add(grp_specs)
@@ -229,13 +229,13 @@ class SpatialWireWindow(Adw.ApplicationWindow):
             self.master_switch.set_active(is_active)
 
             if is_active:
-                self.status_badge_row.set_subtitle(f"Aktiviert ({status['active_profile_name']})")
-                self.status_indicator.set_label("● Aktiv")
+                self.status_badge_row.set_subtitle(f"Active ({status['active_profile_name']})")
+                self.status_indicator.set_label("● Active")
                 self.status_indicator.remove_css_class("dim-label")
                 self.status_indicator.add_css_class("success")
             else:
-                self.status_badge_row.set_subtitle("Inaktiv (Direkte Stereo-Soundkartenausgabe)")
-                self.status_indicator.set_label("○ Inaktiv")
+                self.status_badge_row.set_subtitle("Inactive (Direct Stereo DAC Passthrough)")
+                self.status_indicator.set_label("○ Inactive")
                 self.status_indicator.remove_css_class("success")
                 self.status_indicator.add_css_class("dim-label")
 
@@ -257,7 +257,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
     def update_profile_description(self, idx):
         if 0 <= idx < len(self.presets):
             p = self.presets[idx]
-            ch_info = f"{p['channels']}-Kanal HRIR"
+            ch_info = f"{p['channels']}-Channel HRIR"
             self.profile_desc_row.set_title(f"{p['name']} ({ch_info})")
             self.profile_desc_row.set_subtitle(p["description"])
 
@@ -272,13 +272,13 @@ class SpatialWireWindow(Adw.ApplicationWindow):
                 pid = self.presets[idx]["id"]
                 res = engine.enable_profile(pid)
                 if res.get("success"):
-                    self.show_toast(f"Surround aktiviert: {res['profile_name']}")
+                    self.show_toast(f"Surround enabled: {res['profile_name']}")
                 else:
-                    self.show_toast(f"Fehler: {res.get('error')}")
+                    self.show_toast(f"Error: {res.get('error')}")
                     self.master_switch.set_active(False)
         else:
             engine.disable_spatial()
-            self.show_toast("Surround deaktiviert (Direkter Stereo-Modus)")
+            self.show_toast("Surround disabled (Direct stereo mode)")
 
         self.refresh_ui()
 
@@ -293,21 +293,21 @@ class SpatialWireWindow(Adw.ApplicationWindow):
             pid = self.presets[idx]["id"]
             res = engine.enable_profile(pid)
             if res.get("success"):
-                self.show_toast(f"Profil gewechselt: {res['profile_name']}")
+                self.show_toast(f"Preset activated: {res['profile_name']}")
             else:
-                self.show_toast(f"Fehler: {res.get('error')}")
+                self.show_toast(f"Error: {res.get('error')}")
             self.refresh_ui()
 
     def on_test_clicked(self, btn):
         res = engine.play_surround_test()
         if res.get("success"):
-            self.show_toast("3D-Positionierungstest wird abgespielt...")
+            self.show_toast("Playing 3D channel positioning test...")
         else:
-            self.show_toast(f"Fehler beim Abspielen: {res.get('error')}")
+            self.show_toast(f"Playback failed: {res.get('error')}")
 
     def on_import_clicked(self, btn):
         dialog = Gtk.FileDialog()
-        dialog.set_title("HeSuVi 7/14-Kanal WAV auswählen")
+        dialog.set_title("Select HeSuVi 7- or 14-Channel WAV")
 
         filter_wav = Gtk.FileFilter()
         filter_wav.set_name("WAV Audio (*.wav)")
@@ -323,7 +323,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
                     path = gfile.get_path()
                     res = engine.import_custom_wav(path)
                     if res.get("success"):
-                        self.show_toast(f"Profil importiert: {res['profile_id']}")
+                        self.show_toast(f"Preset imported: {res['profile_id']}")
                         # Reload presets
                         self.presets = engine.list_all_presets()
                         self.preset_ids = [p["id"] for p in self.presets]
@@ -333,9 +333,9 @@ class SpatialWireWindow(Adw.ApplicationWindow):
                         if res["profile_id"] in self.preset_ids:
                             self.profile_combo.set_selected(self.preset_ids.index(res["profile_id"]))
                     else:
-                        self.show_toast(f"Import fehlgeschlagen: {res.get('error')}")
+                        self.show_toast(f"Import failed: {res.get('error')}")
             except Exception as e:
-                self.show_toast(f"Abgebrochen oder Fehler: {e}")
+                self.show_toast(f"Cancelled or error: {e}")
 
         dialog.open(self, None, on_open_finished)
 
