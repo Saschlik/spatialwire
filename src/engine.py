@@ -907,7 +907,11 @@ def import_custom_wav(src_path):
         return {"success": False, "error": f"WAV has {channels} channels. Must be 7 or 14-channel HeSuVi HRIR."}
 
     dest_filename = os.path.basename(src_path)
-    dest_path = os.path.join(USER_PRESETS_DIR, dest_filename)
+    dest_path = os.path.abspath(os.path.join(USER_PRESETS_DIR, dest_filename))
+
+    if os.path.commonpath([dest_path, os.path.abspath(USER_PRESETS_DIR)]) != os.path.abspath(USER_PRESETS_DIR):
+        return {"success": False, "error": "Invalid destination path"}
+
     shutil.copy2(src_path, dest_path)
 
     pid = Path(dest_filename).stem
