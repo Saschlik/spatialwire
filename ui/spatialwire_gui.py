@@ -7,7 +7,6 @@ Modern configuration interface for the PipeWire 7.1 Virtual Surround & Binaural 
 import os
 import sys
 import subprocess
-import json
 import re
 import threading
 
