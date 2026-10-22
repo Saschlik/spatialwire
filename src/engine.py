@@ -364,12 +364,15 @@ def get_virtual_surround_sink(nodes=None):
     return None
 
 
+_presets_cache = None
+_presets_cache_mtimes = {}
+
+
 def list_all_presets():
     """Discovers all available HRIR presets across user, repo, Nix store, and system directories."""
-    ensure_dirs()
-    presets = []
-    seen_ids = set()
+    global _presets_cache, _presets_cache_mtimes
 
+    ensure_dirs()
     search_dirs = [
         USER_PRESETS_DIR,
         BUNDLED_PRESETS_DIR,
@@ -378,9 +381,42 @@ def list_all_presets():
         SYSTEM_PRESETS_DIR,
     ]
 
+    # Check if any directory's mtime has changed
+    cache_valid = _presets_cache is not None
+    current_mtimes = {}
+    if cache_valid:
+        for sdir in search_dirs:
+            if os.path.isdir(sdir):
+                try:
+                    mtime = os.path.getmtime(sdir)
+                    current_mtimes[sdir] = mtime
+                    if _presets_cache_mtimes.get(sdir) != mtime:
+                        cache_valid = False
+                        break
+                except Exception:
+                    cache_valid = False
+                    break
+            else:
+                if sdir in _presets_cache_mtimes:
+                    cache_valid = False
+                    break
+
+    if cache_valid:
+        return list(_presets_cache)
+
+    presets = []
+    seen_ids = set()
+    current_mtimes = {}
+
     for sdir in search_dirs:
         if not os.path.isdir(sdir):
             continue
+
+        try:
+            current_mtimes[sdir] = os.path.getmtime(sdir)
+        except Exception:
+            pass
+
         for fname in sorted(os.listdir(sdir)):
             if not fname.endswith(".wav"):
                 continue
@@ -407,7 +443,10 @@ def list_all_presets():
             })
             seen_ids.add(pid)
 
-    return presets
+    _presets_cache = presets
+    _presets_cache_mtimes = current_mtimes
+
+    return list(presets)
 
 
 def resolve_preset_path(preset_id_or_path):
