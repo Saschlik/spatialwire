@@ -127,8 +127,24 @@ TRANSDUCER_MODES = {
 
 def run_cmd(cmd, check=False):
     """Executes a command and returns stripped stdout."""
+    if not cmd:
+        return ""
+
+    if isinstance(cmd, str):
+        cmd_list = [cmd]
+    else:
+        cmd_list = list(cmd)
+
+    if not cmd_list or not cmd_list[0]:
+        return ""
+
+    executable = shutil.which(cmd_list[0])
+    if not executable:
+        return ""
+
+    cmd_list[0] = executable
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=check, timeout=5)
+        res = subprocess.run(cmd_list, capture_output=True, text=True, check=check, timeout=5)
         return res.stdout.strip()
     except Exception:
         return ""
