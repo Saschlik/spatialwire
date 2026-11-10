@@ -142,7 +142,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         # ── Group 2: HRTF Profile & Transducer Selection ─────────────────────
         grp_profiles = Adw.PreferencesGroup()
-        grp_profiles.set_title("HRTF Acoustic Presets & Transducer Target")
+        grp_profiles.set_title("HRTF Acoustic Presets &amp; Transducer Target")
         grp_profiles.set_description("Select your headphone/IEM type and binaural impulse response measurement.")
 
         self.transducer_keys = ["over-ear", "iem"]
@@ -176,7 +176,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         # ── Group 3: Testing & Import ─────────────────────────────────────────
         grp_tools = Adw.PreferencesGroup()
-        grp_tools.set_title("Diagnostic & Custom Presets")
+        grp_tools.set_title("Diagnostic &amp; Custom Presets")
         grp_tools.set_description("Verify 3D channel positioning and import custom HeSuVi measurements.")
 
         test_row = Adw.ActionRow()
@@ -206,7 +206,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         # ── Group 4: Performance & Hardware Specs ─────────────────────────────
         grp_specs = Adw.PreferencesGroup()
-        grp_specs.set_title("Architecture & Performance")
+        grp_specs.set_title("Architecture &amp; Performance")
 
         row_lat = Adw.ActionRow()
         row_lat.set_title("Processing Latency")
