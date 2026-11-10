@@ -491,9 +491,24 @@ def get_transducer_mode():
     return "over-ear"
 
 
+def _conf_quote(value):
+    """Escapes a string for safe embedding inside a double-quoted SPA-JSON value.
+
+    Control characters (newlines etc.) cannot be represented safely and are rejected;
+    backslashes and double quotes are escaped so a file name can never break out of the string.
+    """
+    value = str(value)
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value):
+        raise ValueError("Control characters are not allowed in preset paths or names")
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def generate_filter_chain_conf(wav_path, profile_name, hw_sink_name, transducer_mode=None):
     """Builds PipeWire filter-chain configuration with 16 acoustic convolvers and optional IEM target compensation."""
     nchan = get_wav_channels(wav_path)
+    wav_path = _conf_quote(wav_path)
+    profile_name = _conf_quote(profile_name)
+    hw_sink_name = _conf_quote(hw_sink_name) if hw_sink_name else hw_sink_name
     t_mode = transducer_mode if transducer_mode in TRANSDUCER_MODES else get_transducer_mode()
 
     if nchan == 7:
@@ -785,7 +800,11 @@ def enable_profile(preset_id_or_path, display_name=None, transducer_mode=None):
         except Exception:
             pass
 
-    conf_content = generate_filter_chain_conf(wav_path, pid, hw_sink_name, transducer_mode=t_mode)
+    try:
+        conf_content = generate_filter_chain_conf(wav_path, pid, hw_sink_name, transducer_mode=t_mode)
+    except ValueError as exc:
+        # Nothing has been written yet and the running service is left untouched.
+        return {"success": False, "error": str(exc)}
     with open(FILTER_CHAIN_CONF, "w", encoding="utf-8") as f:
         f.write(conf_content)
 

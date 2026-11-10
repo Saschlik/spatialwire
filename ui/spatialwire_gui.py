@@ -253,18 +253,18 @@ class SpatialWireWindow(Adw.ApplicationWindow):
                 self.transducer_combo.set_selected(self.transducer_keys.index(t_mode))
 
             if is_active:
-                self.status_badge_row.set_subtitle(f"Active ({status['active_profile_name']} · {t_name})")
+                self.status_badge_row.set_subtitle(GLib.markup_escape_text(f"Active ({status['active_profile_name']} · {t_name})"))
                 self.status_indicator.set_label("● Active")
                 self.status_indicator.remove_css_class("dim-label")
                 self.status_indicator.add_css_class("success")
             else:
-                self.status_badge_row.set_subtitle(f"Inactive (Direct Stereo DAC · Target: {t_name})")
+                self.status_badge_row.set_subtitle(GLib.markup_escape_text(f"Inactive (Direct Stereo DAC · Target: {t_name})"))
                 self.status_indicator.set_label("○ Inactive")
                 self.status_indicator.remove_css_class("success")
                 self.status_indicator.add_css_class("dim-label")
 
             hw_label = status.get("hardware_sink_label", "Default Audio Sink")
-            self.hw_target_row.set_subtitle(hw_label)
+            self.hw_target_row.set_subtitle(GLib.markup_escape_text(str(hw_label)))
 
             # Match active profile in combo
             active_pid = status.get("active_profile_id", "").lower()
@@ -282,8 +282,8 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         if 0 <= idx < len(self.presets):
             p = self.presets[idx]
             ch_info = f"{p['channels']}-Channel HRIR"
-            self.profile_desc_row.set_title(f"{p['name']} ({ch_info})")
-            self.profile_desc_row.set_subtitle(p["description"])
+            self.profile_desc_row.set_title(GLib.markup_escape_text(f"{p['name']} ({ch_info})"))
+            self.profile_desc_row.set_subtitle(GLib.markup_escape_text(str(p["description"])))
 
     def _run_async(self, worker_fn, done_fn):
         if self._busy:
