@@ -44,20 +44,24 @@
 
 ## 🎛️ Bundled FOSS HRTF Profiles
 
-SpatialWire includes curated, license-verified impulse response profiles out of the box:
+SpatialWire includes curated, license-verified impulse response profiles out of the box. In **IEM mode** (`spatialwire mode iem`), SpatialWire filters the selection to the 5 room-modeled (BRIR) profiles whose spectral response matches the built-in IEM biquad compensation (`+1.8 dB @ 250 Hz`, `-3.2 dB @ 2850 Hz`, `-2.0 dB @ 9500 Hz`), while **Over-Ear mode** exposes all 14 profiles (plus any user-imported custom WAVs in both modes):
 
-| Profile ID | Ch | Acoustic Profile | Soundstage Characteristics | Upstream License |
-|---|---|---|---|---|
-| `hear` | 7ch | **MIT KEMAR Reference (1994)** | Diffuse-field equalized HATS reference with natural torso/shoulder warmth | **Free Use with Attribution** (MIT Media Lab) |
-| `sadie_kemar` | 14ch | **SADIE II KEMAR HATS (2018)** | Modern 48 kHz Genelec 8010 HATS measurement with full torso & shoulders | **Apache-2.0** (University of York) |
-| `sadie_kemar_room` | 14ch | **SADIE II KEMAR Studio Room** | KEMAR HATS + Acoustically Treated Studio Room BRIR (85 ms) — ideal for IEMs | **Apache-2.0** (University of York) |
-| `sadie_ku100` | 14ch | **SADIE II Neumann KU 100** | Neumann KU 100 binaural studio head with torso-warmth & pinna smoothing | **Apache-2.0** (University of York) |
-| `oal_dflt` | 7ch | **OpenAL Soft Standard** | Balanced cross-talk and pinpoint HRTF positioning | **LGPL-2.0+** |
-| `oal+` | 14ch | **OpenAL Soft Wide** | Expanded horizontal separation with 150 ms studio room tail (`-27.4 dB`) | **LGPL-2.0+** |
-| `oal++` | 14ch | **OpenAL Soft Extra Wide** | High-separation stage for competitive gaming (`150 ms`, `-26.9 dB`) | **LGPL-2.0+** |
-| `oal+++` | 14ch | **OpenAL Soft Maximum** | Cinema soundstage with 250 ms room decay (`-24.5 dB`) | **LGPL-2.0+** |
-| `oal_cia0` | 7ch | **OpenAL Soft CIA 0** | Close-field anechoic stage from CIAIR / OpenAL Soft dataset | **LGPL-2.0+ / Academic** |
-| `oal_cia1` | 7ch | **OpenAL Soft CIA 1** | Diffuse field from CIAIR / OpenAL Soft dataset | **LGPL-2.0+ / Academic** |
+| Profile ID | Ch | Targets | Acoustic Profile | Soundstage Characteristics | Upstream License |
+|---|---|---|---|---|---|
+| `hear` | 7ch | Over-Ear | **MIT KEMAR Reference (1994)** | Diffuse-field equalized HATS reference with natural torso/shoulder warmth | **Free Use with Attribution** (MIT Media Lab) |
+| `sadie_kemar` | 14ch | Over-Ear | **SADIE II KEMAR HATS (2018)** | Modern 48 kHz Genelec 8010 HATS measurement with full torso & shoulders | **Apache-2.0** (University of York) |
+| `sadie_kemar_room` | 14ch | Over-Ear, IEM | **SADIE II KEMAR Studio Room** | KEMAR HATS + Acoustically Treated Studio Room BRIR (85 ms) — ideal for IEMs | **Apache-2.0** (University of York) |
+| `sadie_ku100` | 14ch | Over-Ear | **SADIE II Neumann KU 100** | Neumann KU 100 binaural studio head with torso-warmth & pinna smoothing | **Apache-2.0** (University of York) |
+| `sadie_ku100_room` | 14ch | Over-Ear, IEM | **SADIE II Neumann KU 100 Room** | Neumann KU 100 + Studio Room BRIR (85 ms) — eliminates dry in-head fatigue | **Apache-2.0** (University of York) |
+| `sadie_wide` | 14ch | Over-Ear, IEM | **SADIE II Studio Wide** | KEMAR HATS with wide studio reflection model (`150 ms`, `-27.4 dB`) | **Apache-2.0** (University of York) |
+| `sadie_extrawide` | 14ch | Over-Ear, IEM | **SADIE II Studio Extra Wide** | KEMAR HATS with extra wide spatial separation (`150 ms`, `-26.0 dB`) | **Apache-2.0** (University of York) |
+| `sadie_cinema` | 14ch | Over-Ear, IEM | **SADIE II Cinematic Hall** | KEMAR HATS with expansive cinema hall acoustics (`250 ms`, `-24.5 dB`) | **Apache-2.0** (University of York) |
+| `oal_dflt` | 7ch | Over-Ear | **OpenAL Soft Standard** | Balanced cross-talk and pinpoint HRTF positioning | **LGPL-2.0+** |
+| `oal+` | 14ch | Over-Ear | **OpenAL Soft Wide** | Expanded horizontal separation with 150 ms studio room tail (`-27.4 dB`) | **LGPL-2.0+** |
+| `oal++` | 14ch | Over-Ear | **OpenAL Soft Extra Wide** | High-separation stage for competitive gaming (`150 ms`, `-26.9 dB`) | **LGPL-2.0+** |
+| `oal+++` | 14ch | Over-Ear | **OpenAL Soft Maximum** | Cinema soundstage with 250 ms room decay (`-24.5 dB`) | **LGPL-2.0+** |
+| `oal_cia0` | 7ch | Over-Ear | **OpenAL Soft CIA 0** | Close-field anechoic stage from CIAIR / OpenAL Soft dataset | **LGPL-2.0+ / Academic** |
+| `oal_cia1` | 7ch | Over-Ear | **OpenAL Soft CIA 1** | Diffuse field from CIAIR / OpenAL Soft dataset | **LGPL-2.0+ / Academic** |
 
 *(For full licensing and attributions, see [AUDIO_LICENSES.md](AUDIO_LICENSES.md).)*
 
@@ -122,8 +126,9 @@ spatialwire-settings
 # Check current surround status & active soundcard
 spatialwire status
 
-# List all available HRTF profiles & channel configurations
+# List verified HRTF profiles for active transducer mode (or pass --all)
 spatialwire list
+spatialwire list --all
 
 # Activate a profile (e.g. MIT KEMAR Reference or SADIE II KEMAR Studio Room)
 spatialwire set hear

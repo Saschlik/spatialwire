@@ -4,6 +4,7 @@ DATADIR ?= $(PREFIX)/share
 APPDIR ?= $(DATADIR)/applications
 PRESETSDIR ?= $(DATADIR)/spatialwire/presets
 ASSETSDIR ?= $(DATADIR)/spatialwire/assets
+LICENSESDIR ?= $(DATADIR)/licenses/spatialwire
 
 .PHONY: all install uninstall clean
 
@@ -20,12 +21,17 @@ install:
 	cp -r presets/* $(DESTDIR)$(PRESETSDIR)/
 	mkdir -p $(DESTDIR)$(ASSETSDIR)
 	cp -r assets/* $(DESTDIR)$(ASSETSDIR)/
+	mkdir -p $(DESTDIR)$(LICENSESDIR)
+	install -Dm644 LICENSE $(DESTDIR)$(LICENSESDIR)/LICENSE
+	install -Dm644 AUDIO_LICENSES.md $(DESTDIR)$(LICENSESDIR)/AUDIO_LICENSES.md
+	cp -r LICENSES $(DESTDIR)$(LICENSESDIR)/
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/spatialwire
 	rm -f $(DESTDIR)$(BINDIR)/spatialwire-settings
 	rm -f $(DESTDIR)$(APPDIR)/com.github.saschlik.SpatialWire.desktop
 	rm -rf $(DESTDIR)$(DATADIR)/spatialwire
+	rm -rf $(DESTDIR)$(LICENSESDIR)
 
 clean:
 	rm -rf __pycache__ src/__pycache__ ui/__pycache__

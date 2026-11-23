@@ -6,30 +6,25 @@ Modern configuration interface for the PipeWire 7.1 Virtual Surround & Binaural 
 
 import os
 import sys
-import re
+import glob
 import threading
 
-# ── Dynamic Typelib Environment Setup (Fallback only if gi is not in environment) ──
-if "GI_TYPELIB_PATH" not in os.environ:
-    wrapper_path = "/run/current-system/sw/bin/balonix-settings"
-    if os.path.exists(wrapper_path):
-        try:
-            with open(wrapper_path, "rb") as f:
-                content = f.read().decode("latin1", errors="ignore")
-            m_gi = re.search(r"(/nix/store/[^\x00]+libadwaita[^\x00]+girepository-1\.0)", content)
-            m_mod = re.search(r"(/nix/store/[^\x00]+dconf[^\x00]+gio/modules)", content)
-            m_pix = re.search(r"(/nix/store/[^\x00]+librsvg[^\x00]+loaders\.cache)", content)
-            m_xdg = re.search(r"(/nix/store/[^\x00]+gsettings-desktop-schemas[^\x00]+gtk4[^\x00]+)", content)
-            if m_gi:
-                os.environ["GI_TYPELIB_PATH"] = m_gi.group(1)
-            if m_mod:
-                os.environ["GIO_EXTRA_MODULES"] = m_mod.group(1)
-            if m_pix:
-                os.environ["GDK_PIXBUF_MODULE_FILE"] = m_pix.group(1)
-            if m_xdg:
-                os.environ["XDG_DATA_DIRS"] = m_xdg.group(1) + ":" + os.environ.get("XDG_DATA_DIRS", "/usr/share")
-        except Exception:
-            pass
+# ── Generic NixOS Typelib Fallback (only if GI_TYPELIB_PATH is unset on unwrapped NixOS) ──
+if "GI_TYPELIB_PATH" not in os.environ and os.path.isdir("/nix/store"):
+    try:
+        _prefixes = (
+            "glib-", "gdk-pixbuf-", "graphene-", "pango-", "harfbuzz-",
+            "gtk4-", "libadwaita-", "gobject-introspection-", "librsvg-",
+            "gsettings-desktop-schemas-",
+        )
+        _gi_paths = [
+            p for p in glob.glob("/nix/store/*/lib/girepository-1.0")
+            if os.path.basename(os.path.dirname(os.path.dirname(p))).split("-", 1)[-1].startswith(_prefixes)
+        ]
+        if _gi_paths:
+            os.environ["GI_TYPELIB_PATH"] = ":".join(_gi_paths)
+    except Exception:
+        pass
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -75,7 +70,8 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         self._updating = False
         self._busy = False
 
-        self.presets = engine.list_all_presets()
+        self._current_transducer_mode = engine.get_transducer_mode()
+        self.presets = engine.list_all_presets(transducer_mode=self._current_transducer_mode)
         self.preset_ids = [p["id"] for p in self.presets]
 
         # Layout
@@ -143,7 +139,7 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         # ── Group 2: HRTF Profile & Transducer Selection ─────────────────────
         grp_profiles = Adw.PreferencesGroup()
         grp_profiles.set_title("HRTF Acoustic Presets &amp; Transducer Target")
-        grp_profiles.set_description("Select your headphone/IEM type and binaural impulse response measurement.")
+        grp_profiles.set_description("Select your headphone/IEM type to show verified binaural impulse responses.")
 
         self.transducer_keys = ["over-ear", "iem"]
         self.transducer_combo = Adw.ComboRow()
@@ -181,14 +177,17 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
         test_row = Adw.ActionRow()
         test_row.set_title("Play 3D Channel Positioning Test")
-        test_row.set_subtitle("Audition 8-channel directional voices and subwoofer sweep")
-        test_btn = Gtk.Button(label="Play Test")
-        test_btn.set_icon_name("media-playback-start-symbolic")
-        test_btn.set_valign(Gtk.Align.CENTER)
-        test_btn.add_css_class("suggested-action")
-        test_btn.connect("clicked", self.on_test_clicked)
-        test_row.add_suffix(test_btn)
-        test_row.set_activatable_widget(test_btn)
+        test_row.set_subtitle("Audition 8-channel directional chimes, spatial cues and subwoofer sweep")
+        self.test_btn_content = Adw.ButtonContent(
+            icon_name="media-playback-start-symbolic",
+            label="Play Test",
+        )
+        self.test_btn = Gtk.Button(child=self.test_btn_content)
+        self.test_btn.set_valign(Gtk.Align.CENTER)
+        self.test_btn.add_css_class("suggested-action")
+        self.test_btn.connect("clicked", self.on_test_clicked)
+        test_row.add_suffix(self.test_btn)
+        test_row.set_activatable_widget(self.test_btn)
         grp_tools.add(test_row)
 
         import_row = Adw.ActionRow()
@@ -226,12 +225,28 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         content_box.append(self.toast_overlay)
 
         self.set_content(content_box)
+        self.connect("close-request", lambda _win: (engine.stop_surround_test(), False)[1])
 
         # Initial UI population & live status sync
         self.refresh_ui()
         GLib.timeout_add_seconds(2, self.periodic_check)
 
+    def _update_test_button_state(self):
+        playing = engine.is_surround_test_playing()
+        if playing:
+            self.test_btn_content.set_icon_name("media-playback-stop-symbolic")
+            self.test_btn_content.set_label("Stop Test")
+            self.test_btn.remove_css_class("suggested-action")
+            self.test_btn.add_css_class("destructive-action")
+        else:
+            self.test_btn_content.set_icon_name("media-playback-start-symbolic")
+            self.test_btn_content.set_label("Play Test")
+            self.test_btn.remove_css_class("destructive-action")
+            self.test_btn.add_css_class("suggested-action")
+        return playing
+
     def periodic_check(self):
+        self._update_test_button_state()
         if not self._updating and not self._busy:
             self.refresh_ui()
         return True
@@ -239,6 +254,22 @@ class SpatialWireWindow(Adw.ApplicationWindow):
     def show_toast(self, message):
         toast = Adw.Toast(title=message)
         self.toast_overlay.add_toast(toast)
+
+    def _sync_presets_for_mode(self, t_mode, preferred_pid=None, force=False):
+        if not force and t_mode == self._current_transducer_mode:
+            return
+        self._current_transducer_mode = t_mode
+        self.presets = engine.list_all_presets(transducer_mode=t_mode)
+        self.preset_ids = [p["id"] for p in self.presets]
+        profile_names = [f"{p['name']} ({p['category']})" for p in self.presets]
+        self.profile_combo.set_model(Gtk.StringList.new(profile_names))
+
+        target_pid = preferred_pid or engine.get_default_preset(t_mode)
+        lower_ids = [pid.lower() for pid in self.preset_ids]
+        if target_pid and target_pid.lower() in lower_ids:
+            self.profile_combo.set_selected(lower_ids.index(target_pid.lower()))
+        elif self.preset_ids:
+            self.profile_combo.set_selected(0)
 
     def refresh_ui(self):
         self._updating = True
@@ -251,6 +282,8 @@ class SpatialWireWindow(Adw.ApplicationWindow):
             t_name = status.get("transducer_mode_name", "Over-Ear Headphones")
             if t_mode in self.transducer_keys:
                 self.transducer_combo.set_selected(self.transducer_keys.index(t_mode))
+
+            self._sync_presets_for_mode(t_mode, preferred_pid=status.get("active_profile_id"))
 
             if is_active:
                 self.status_badge_row.set_subtitle(GLib.markup_escape_text(f"Active ({status['active_profile_name']} · {t_name})"))
@@ -268,8 +301,9 @@ class SpatialWireWindow(Adw.ApplicationWindow):
 
             # Match active profile in combo
             active_pid = status.get("active_profile_id", "").lower()
-            if active_pid in self.preset_ids:
-                idx = self.preset_ids.index(active_pid)
+            lower_ids = [pid.lower() for pid in self.preset_ids]
+            if active_pid in lower_ids:
+                idx = lower_ids.index(active_pid)
                 self.profile_combo.set_selected(idx)
                 self.update_profile_description(idx)
             elif self.preset_ids:
@@ -340,10 +374,15 @@ class SpatialWireWindow(Adw.ApplicationWindow):
         t_idx = row.get_selected()
         if 0 <= t_idx < len(self.transducer_keys):
             t_mode = self.transducer_keys[t_idx]
+            if t_mode == self._current_transducer_mode:
+                return
 
             def on_done(res):
                 if res.get("success"):
-                    self.show_toast(f"Target set: {res.get('transducer_mode_name')}")
+                    if res.get("switched_profile"):
+                        self.show_toast(f"Target: {res.get('transducer_mode_name')} · Preset: {res.get('profile_name')}")
+                    else:
+                        self.show_toast(f"Target set: {res.get('transducer_mode_name')}")
                 else:
                     self.show_toast(f"Error: {res.get('error')}")
 
@@ -370,8 +409,16 @@ class SpatialWireWindow(Adw.ApplicationWindow):
             self._run_async(lambda: engine.enable_profile(pid, transducer_mode=t_mode), on_done)
 
     def on_test_clicked(self, btn):
+        if engine.is_surround_test_playing():
+            engine.stop_surround_test()
+            self._update_test_button_state()
+            self.show_toast("Stopped 3D positioning test.")
+            return
+
         res = engine.play_surround_test()
         if res.get("success"):
+            self._update_test_button_state()
+            GLib.timeout_add(400, self._update_test_button_state)
             self.show_toast("Playing 3D channel positioning test...")
         else:
             self.show_toast(f"Playback failed: {res.get('error')}")
@@ -395,14 +442,16 @@ class SpatialWireWindow(Adw.ApplicationWindow):
                     res = engine.import_custom_wav(path)
                     if res.get("success"):
                         self.show_toast(f"Preset imported: {res['profile_id']}")
-                        # Reload presets
-                        self.presets = engine.list_all_presets()
-                        self.preset_ids = [p["id"] for p in self.presets]
-                        profile_names = [f"{p['name']} ({p['category']})" for p in self.presets]
-                        self.profile_combo.set_model(Gtk.StringList.new(profile_names))
-                        # Select newly imported
-                        if res["profile_id"] in self.preset_ids:
-                            self.profile_combo.set_selected(self.preset_ids.index(res["profile_id"]))
+                        self._updating = True
+                        try:
+                            self._sync_presets_for_mode(
+                                self._current_transducer_mode,
+                                preferred_pid=res["profile_id"],
+                                force=True,
+                            )
+                            self.update_profile_description(self.profile_combo.get_selected())
+                        finally:
+                            self._updating = False
                     else:
                         self.show_toast(f"Import failed: {res.get('error')}")
             except Exception as e:

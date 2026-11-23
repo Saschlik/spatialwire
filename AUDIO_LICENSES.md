@@ -25,7 +25,7 @@ All bundled Head-Related Impulse Responses (HRIR) and testing assets included in
 | `presets/oal+++.wav` | OpenAL Soft Maximum | OpenAL Soft Cinema HRIR (14-channel, 250 ms room tail) | **LGPL-2.0+** | Chris Robinson & OpenAL Soft Contributors |
 | `presets/oal_cia0.wav` | OpenAL Soft CIA 0 | CIAIR / OpenAL Soft HRIR Preset 0 (7-channel) | **LGPL-2.0+ / Open Academic Dataset** | OpenAL Soft Project / Nagoya University CIAIR Database |
 | `presets/oal_cia1.wav` | OpenAL Soft CIA 1 | CIAIR / OpenAL Soft HRIR Preset 1 (7-channel) | **LGPL-2.0+ / Open Academic Dataset** | OpenAL Soft Project / Nagoya University CIAIR Database |
-| `assets/test_surround.wav` | 3D Spatial Audio Test | 8-channel (7.1) directional acoustic chimes & spoken positional announcements generated via eSpeak-NG | **CC0-1.0 / MIT** (Public Domain) | SpatialWire Project |
+| `assets/test_surround.wav` | 3D Spatial Audio Test | 8-channel (7.1) synthesized harmonic chimes, shaped pink-noise localization cues & sub-bass LFE sweep | **CC0-1.0 / MIT** (Public Domain) | SpatialWire Project |
 
 ---
 

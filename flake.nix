@@ -37,11 +37,15 @@
             mkdir -p $out/share/spatialwire/presets
             mkdir -p $out/share/spatialwire/assets
             mkdir -p $out/share/spatialwire/src
+            mkdir -p $out/share/licenses/spatialwire
             mkdir -p $out/share/applications
 
             cp -r presets/* $out/share/spatialwire/presets/
             cp -r assets/* $out/share/spatialwire/assets/
             cp -r src/* $out/share/spatialwire/src/
+
+            cp LICENSE AUDIO_LICENSES.md $out/share/licenses/spatialwire/
+            cp -r LICENSES $out/share/licenses/spatialwire/
 
             cp ui/com.github.saschlik.SpatialWire.desktop $out/share/applications/
 

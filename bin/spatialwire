@@ -6,6 +6,7 @@ PipeWire native zero-overhead spatial audio control for Linux.
 
 import sys
 import os
+import shutil
 import argparse
 import json
 import subprocess
@@ -64,32 +65,52 @@ def cmd_status(args):
 
 
 def cmd_list(args):
-    presets = engine.list_all_presets()
+    current_status = engine.get_current_status()
+    t_mode = getattr(args, "mode", None) or current_status.get("transducer_mode", "over-ear")
+    show_all = getattr(args, "all", False)
+    presets = engine.list_all_presets(transducer_mode=t_mode, include_all=show_all)
     if getattr(args, "json", False):
         print(json.dumps(presets, indent=2))
         return
 
     print_banner()
-    print(f"\n{C_BOLD}{'PRESET ID':<18} {'PROFILE NAME':<28} {'CH':<4} {'CATEGORY':<22} {'DESCRIPTION'}{C_RESET}")
-    print(f"{C_DIM}{'─'*18} {'─'*28} {'─'*4} {'─'*22} {'─'*40}{C_RESET}")
+    mode_label = "All Transducers" if show_all else engine.TRANSDUCER_MODES[t_mode]["name"]
+    print(f"{C_DIM}Showing verified presets for: {C_MAGENTA}{mode_label}{C_RESET}{C_DIM} (use '--all' for full list){C_RESET}")
+    print(f"\n{C_BOLD}{'PRESET ID':<18} {'PROFILE NAME':<28} {'CH':<4} {'TARGETS':<14} {'CATEGORY':<22} {'DESCRIPTION'}{C_RESET}")
+    print(f"{C_DIM}{'─'*18} {'─'*28} {'─'*4} {'─'*14} {'─'*22} {'─'*36}{C_RESET}")
 
-    current_status = engine.get_current_status()
     active_pid = current_status.get("active_profile_id", "").lower()
 
     for p in presets:
         marker = f"{C_GREEN}* {C_RESET}" if p["id"].lower() == active_pid else "  "
         ch_str = f"{p['channels']}ch"
-        print(f"{marker}{C_CYAN}{p['id']:<16}{C_RESET} {C_BOLD}{p['name']:<28}{C_RESET} {ch_str:<4} {C_MAGENTA}{p['category']:<22}{C_RESET} {C_DIM}{p['description'][:48]}...{C_RESET}")
+        t_list = p.get("targets", ["over-ear", "iem"])
+        if p.get("is_custom"):
+            t_str = "Custom/Both"
+        elif "over-ear" in t_list and "iem" in t_list:
+            t_str = "Over-Ear, IEM"
+        elif "iem" in t_list:
+            t_str = "IEM"
+        else:
+            t_str = "Over-Ear"
+        print(f"{marker}{C_CYAN}{p['id']:<16}{C_RESET} {C_BOLD}{p['name']:<28}{C_RESET} {ch_str:<4} {C_DIM}{t_str:<14}{C_RESET} {C_MAGENTA}{p['category']:<22}{C_RESET} {C_DIM}{p['description'][:40]}...{C_RESET}")
 
 
 def cmd_set(args):
-    if not args.profile:
-        print(f"{C_RED}Error:{C_RESET} Please specify a preset ID or path to a .wav HRIR file.")
-        sys.exit(1)
+    t_mode = getattr(args, "mode", None) or engine.get_transducer_mode()
+    profile = args.profile
+    if not profile:
+        if args.subcommand in ("on", "enable", "start"):
+            profile = engine.get_default_preset(t_mode)
+        else:
+            print(f"{C_RED}Error:{C_RESET} Please specify a preset ID or path to a .wav HRIR file.")
+            sys.exit(1)
 
-    t_mode = getattr(args, "mode", None)
-    print(f"{C_BLUE}:: Activating SpatialWire 7.1 HRTF filter-chain with preset '{args.profile}'...{C_RESET}")
-    res = engine.enable_profile(args.profile, transducer_mode=t_mode)
+    if not engine.is_preset_compatible(profile, t_mode):
+        print(f"{C_YELLOW}Note:{C_RESET} '{profile}' is tuned for Over-Ear and is not in the verified {t_mode.upper()} list.")
+
+    print(f"{C_BLUE}:: Activating SpatialWire 7.1 HRTF filter-chain with preset '{profile}'...{C_RESET}")
+    res = engine.enable_profile(profile, transducer_mode=t_mode)
     if res.get("success"):
         print(f"{C_GREEN}✓ Activated:{C_RESET} {C_BOLD}{res['profile_name']}{C_RESET} [{C_MAGENTA}{res.get('transducer_mode_name')}{C_RESET}]")
         print(f"  Target: {res['hardware_sink']} (PipeWire Virtual Sink ID {res['virtual_sink_id']})")
@@ -108,6 +129,8 @@ def cmd_mode(args):
     res = engine.set_transducer_mode(args.target)
     if res.get("success"):
         print(f"{C_GREEN}✓ Transducer Mode:{C_RESET} {C_BOLD}{res.get('transducer_mode_name')}{C_RESET}")
+        if res.get("switched_profile"):
+            print(f"  {C_CYAN}→ Switched to verified preset:{C_RESET} {res.get('profile_name')}")
     else:
         print(f"{C_RED}✗ Failed:{C_RESET} {res.get('error', 'Unknown error')}")
         sys.exit(1)
@@ -176,7 +199,9 @@ def main():
     p_status.add_argument("--json", action="store_true", help="Output status in JSON format")
 
     # list
-    p_list = subparsers.add_parser("list", help="List all available HRTF / HeSuVi presets")
+    p_list = subparsers.add_parser("list", help="List available HRTF / HeSuVi presets for current transducer mode")
+    p_list.add_argument("--mode", choices=["over-ear", "iem"], help="Filter presets for a specific transducer mode")
+    p_list.add_argument("--all", action="store_true", help="Show all presets regardless of transducer mode")
     p_list.add_argument("--json", action="store_true", help="Output presets list in JSON format")
 
     # set / on / enable / start
@@ -185,8 +210,8 @@ def main():
     p_set.add_argument("--mode", choices=["over-ear", "iem"], help="Optional transducer target mode ('over-ear' or 'iem')")
 
     for alias in ("on", "enable", "start"):
-        p_on = subparsers.add_parser(alias, help="Enable virtual surround (defaults to 'hear' if no preset specified)")
-        p_on.add_argument("profile", nargs="?", default="hear", help="Optional preset ID (default: 'hear')")
+        p_on = subparsers.add_parser(alias, help="Enable virtual surround (defaults to mode's recommended preset)")
+        p_on.add_argument("profile", nargs="?", default=None, help="Optional preset ID (defaults to 'hear' for Over-Ear, 'sadie_kemar_room' for IEM)")
         p_on.add_argument("--mode", choices=["over-ear", "iem"], help="Optional transducer target mode ('over-ear' or 'iem')")
 
     # mode

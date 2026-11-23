@@ -42,73 +42,92 @@ FOSS_PRESET_METADATA = {
     "hear": {
         "name": "MIT KEMAR Reference (1994)",
         "description": "Diffuse-field equalized MIT Media Lab KEMAR HATS reference with natural torso/shoulder warmth.",
-        "category": "Studio Reference"
+        "category": "Studio Reference",
+        "targets": ["over-ear"],
     },
     "sadie_kemar": {
         "name": "SADIE II KEMAR HATS (2018)",
         "description": "University of York KEMAR Head & Torso Simulator (48 kHz Genelec 8010, Apache-2.0) with full torso & shoulder reflections.",
-        "category": "HATS Torso Reference"
+        "category": "HATS Torso Reference",
+        "targets": ["over-ear"],
     },
     "sadie_kemar_room": {
         "name": "SADIE II KEMAR Studio Room",
         "description": "University of York KEMAR HATS + Acoustically Treated Listening Room BRIR (85 ms Genelec 8030/40, Apache-2.0) — ideal for IEMs.",
-        "category": "Studio Room & IEM"
+        "category": "Studio Room & IEM",
+        "targets": ["over-ear", "iem"],
     },
     "sadie_ku100": {
         "name": "SADIE II Neumann KU 100",
         "description": "University of York Neumann KU 100 binaural studio microphone head (Apache-2.0) with torso-warmth and pinna-smoothing compensation.",
-        "category": "Binaural Studio Mic"
+        "category": "Binaural Studio Mic",
+        "targets": ["over-ear"],
     },
     "sadie_ku100_room": {
         "name": "SADIE II Neumann KU 100 Room",
         "description": "University of York Neumann KU 100 with warm studio room reflections (85 ms decay, Apache-2.0) — eliminates dry in-head fatigue.",
-        "category": "Studio Room & IEM"
+        "category": "Studio Room & IEM",
+        "targets": ["over-ear", "iem"],
     },
     "sadie_wide": {
         "name": "SADIE II Studio Wide",
         "description": "University of York KEMAR reference with expanded room reflections (150 ms, -27.4 dB, Apache-2.0).",
-        "category": "Wide Soundstage"
+        "category": "Wide Soundstage",
+        "targets": ["over-ear", "iem"],
     },
     "sadie_extrawide": {
         "name": "SADIE II Studio Extra Wide",
         "description": "University of York KEMAR with enhanced spatial separation and room presence (150 ms, -26.0 dB, Apache-2.0).",
-        "category": "Competitive Gaming"
+        "category": "Competitive Gaming",
+        "targets": ["over-ear", "iem"],
     },
     "sadie_cinema": {
         "name": "SADIE II Cinematic Hall",
         "description": "University of York KEMAR reference with expansive cinema room acoustics (250 ms, -24.5 dB, Apache-2.0).",
-        "category": "Cinematic Surround"
+        "category": "Cinematic Surround",
+        "targets": ["over-ear", "iem"],
     },
     "oal_dflt": {
         "name": "OpenAL Soft Standard",
         "description": "Natural gaming soundstage with balanced cross-talk and pinpoint HRTF positioning.",
-        "category": "Gaming & Multimedia"
+        "category": "Gaming & Multimedia",
+        "targets": ["over-ear"],
     },
     "oal+": {
         "name": "OpenAL Soft Wide",
         "description": "Expanded horizontal stereo separation and 150 ms studio room reflections (-27.4 dB).",
-        "category": "Wide Soundstage"
+        "category": "Wide Soundstage",
+        "targets": ["over-ear"],
     },
     "oal++": {
         "name": "OpenAL Soft Extra Wide",
         "description": "Pronounced spatial separation for competitive gaming and open-world immersion (150 ms, -26.9 dB).",
-        "category": "Competitive Gaming"
+        "category": "Competitive Gaming",
+        "targets": ["over-ear"],
     },
     "oal+++": {
         "name": "OpenAL Soft Maximum",
         "description": "Maximum cinema soundstage with 250 ms room decay (-24.5 dB) and deep rear channel expanse.",
-        "category": "Cinematic Surround"
+        "category": "Cinematic Surround",
+        "targets": ["over-ear"],
     },
     "oal_cia0": {
         "name": "OpenAL Soft CIA 0",
         "description": "Close-field anechoic binaural HRIR profile from the CIAIR / OpenAL Soft acoustic dataset.",
-        "category": "Studio Close"
+        "category": "Studio Close",
+        "targets": ["over-ear"],
     },
     "oal_cia1": {
         "name": "OpenAL Soft CIA 1",
         "description": "Diffused binaural HRIR field from the CIAIR / OpenAL Soft acoustic dataset.",
-        "category": "Open-Back Audiophile"
+        "category": "Open-Back Audiophile",
+        "targets": ["over-ear"],
     }
+}
+
+DEFAULT_PRESET_BY_MODE = {
+    "over-ear": "hear",
+    "iem": "sadie_kemar_room",
 }
 
 TRANSDUCER_MODES = {
@@ -384,7 +403,46 @@ _presets_cache = None
 _presets_cache_mtimes = {}
 
 
-def list_all_presets():
+_PRESET_ORDER = {pid: idx for idx, pid in enumerate(FOSS_PRESET_METADATA)}
+
+
+def _filter_and_sort_presets(presets, transducer_mode=None, include_all=False):
+    """Filters presets by transducer target compatibility and orders curated profiles first."""
+    if transducer_mode in TRANSDUCER_MODES and not include_all:
+        filtered = [
+            p for p in presets
+            if p.get("is_custom") or transducer_mode in p.get("targets", ["over-ear", "iem"])
+        ]
+    else:
+        filtered = list(presets)
+
+    return sorted(
+        filtered,
+        key=lambda p: (
+            1 if p.get("is_custom") else 0,
+            _PRESET_ORDER.get(p["id"], 9999),
+            p["id"].lower(),
+        ),
+    )
+
+
+def get_default_preset(transducer_mode="over-ear"):
+    """Returns the recommended default preset ID for the given transducer mode."""
+    return DEFAULT_PRESET_BY_MODE.get(transducer_mode, "hear")
+
+
+def is_preset_compatible(preset_id_or_path, transducer_mode):
+    """Checks whether a preset ID is verified for the given transducer mode (custom WAVs always pass)."""
+    if not preset_id_or_path or transducer_mode not in TRANSDUCER_MODES:
+        return True
+    pid = Path(preset_id_or_path).stem if preset_id_or_path.lower().endswith(".wav") else preset_id_or_path
+    meta = FOSS_PRESET_METADATA.get(pid)
+    if meta is None:
+        return True
+    return transducer_mode in meta.get("targets", ["over-ear", "iem"])
+
+
+def list_all_presets(transducer_mode=None, include_all=False):
     """Discovers all available HRIR presets across user, repo, Nix store, and system directories."""
     global _presets_cache, _presets_cache_mtimes
 
@@ -418,7 +476,7 @@ def list_all_presets():
                     break
 
     if cache_valid:
-        return list(_presets_cache)
+        return _filter_and_sort_presets(_presets_cache, transducer_mode=transducer_mode, include_all=include_all)
 
     presets = []
     seen_ids = set()
@@ -445,7 +503,8 @@ def list_all_presets():
             meta = FOSS_PRESET_METADATA.get(pid, {
                 "name": pid.replace("_", " ").title(),
                 "description": f"Custom {channels}-channel HRIR impulse response measurement.",
-                "category": "User Preset" if sdir == USER_PRESETS_DIR else "Imported Profile"
+                "category": "User Preset" if sdir == USER_PRESETS_DIR else "Imported Profile",
+                "targets": ["over-ear", "iem"],
             })
 
             presets.append({
@@ -453,6 +512,7 @@ def list_all_presets():
                 "name": meta["name"],
                 "description": meta["description"],
                 "category": meta["category"],
+                "targets": list(meta.get("targets", ["over-ear", "iem"])),
                 "channels": channels,
                 "path": full_path,
                 "is_custom": sdir == USER_PRESETS_DIR
@@ -462,7 +522,7 @@ def list_all_presets():
     _presets_cache = presets
     _presets_cache_mtimes = current_mtimes
 
-    return list(presets)
+    return _filter_and_sort_presets(presets, transducer_mode=transducer_mode, include_all=include_all)
 
 
 def resolve_preset_path(preset_id_or_path):
@@ -736,7 +796,7 @@ def get_current_status():
 
     if is_active:
         lbl = vsink.get("label", "")
-        m = re.search(r"Virtual Surround 7\.1 \(([^)]+)\)", lbl)
+        m = re.search(r"Virtual Surround 7\.1 \((.+)\)$", lbl)
         if m:
             active_profile_id = m.group(1)
 
@@ -879,20 +939,32 @@ def set_transducer_mode(mode):
         except Exception:
             saved = {}
 
+    status = get_current_status()
+    pid = status.get("active_profile_id") or saved.get("active_profile_id") or get_default_preset(norm)
+    switched_profile = False
+    if not is_preset_compatible(pid, norm):
+        pid = get_default_preset(norm)
+        switched_profile = True
+        saved["active_profile_id"] = pid
+        saved["active_profile_name"] = FOSS_PRESET_METADATA.get(pid, {}).get("name", pid)
+
     saved["transducer_mode"] = norm
     saved["updated_at"] = time.time()
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(saved, f, indent=2)
 
-    status = get_current_status()
     if status["active"]:
-        pid = status.get("active_profile_id") or saved.get("active_profile_id") or "hear"
-        return enable_profile(pid, transducer_mode=norm)
+        res = enable_profile(pid, transducer_mode=norm)
+        res["switched_profile"] = switched_profile
+        return res
 
     return {
         "success": True,
         "transducer_mode": norm,
         "transducer_mode_name": TRANSDUCER_MODES[norm]["name"],
+        "profile_id": pid,
+        "profile_name": FOSS_PRESET_METADATA.get(pid, {}).get("name", pid),
+        "switched_profile": switched_profile,
         "reloaded": False
     }
 
@@ -942,8 +1014,41 @@ def disable_spatial():
     return {"success": True, "restored_sink": hw_sink.get("label") if hw_sink else None}
 
 
+_test_proc = None
+
+
+def is_surround_test_playing():
+    """Returns True if a test playback process started by SpatialWire is currently running."""
+    global _test_proc
+    if _test_proc is not None and _test_proc.poll() is None:
+        return True
+    _test_proc = None
+    return False
+
+
+def stop_surround_test():
+    """Stops any currently running 3D test audio playback."""
+    global _test_proc
+    stopped = False
+    if _test_proc is not None and _test_proc.poll() is None:
+        try:
+            _test_proc.terminate()
+            _test_proc.wait(timeout=1.5)
+        except Exception:
+            try:
+                _test_proc.kill()
+            except Exception:
+                pass
+        stopped = True
+    _test_proc = None
+    return {"success": True, "stopped": stopped}
+
+
 def play_surround_test():
-    """Plays an 8-channel directional test audio to verify spatial perception."""
+    """Plays an 8-channel directional test audio to verify spatial perception (stops previous run if active)."""
+    global _test_proc
+    stop_surround_test()
+
     test_file = None
     for cand in [
         os.path.join(REPO_DIR, "assets/test_surround.wav"),
@@ -961,10 +1066,10 @@ def play_surround_test():
         return {"success": False, "error": "Test audio asset not found"}
 
     if shutil.which("pw-play"):
-        subprocess.Popen(["pw-play", test_file])
+        _test_proc = subprocess.Popen(["pw-play", test_file])
         return {"success": True, "player": "pw-play", "file": test_file}
     elif shutil.which("mpv"):
-        subprocess.Popen(["mpv", "--no-video", test_file])
+        _test_proc = subprocess.Popen(["mpv", "--no-video", test_file])
         return {"success": True, "player": "mpv", "file": test_file}
 
     return {"success": False, "error": "Neither pw-play nor mpv found"}
